@@ -86,6 +86,10 @@ const I18N_ES = {
   'details.unlimitedAttempts': 'Intentos ilimitados',
   'details.attempts': (n) => `${n} ${n === 1 ? 'intento' : 'intentos'}`,
   'details.open': 'Abrir en Canvas',
+  'discard.button': 'Descartar',
+  'discard.closed': 'Ya no se puede entregar',
+  'discard.done': 'Tarea descartada',
+  'discard.undo': 'Deshacer',
 
   // Banner, pie y barra de título
   'banner.settings': 'Ajustes',

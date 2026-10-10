@@ -78,6 +78,10 @@ const I18N_EN = {
   'details.unlimitedAttempts': 'Unlimited attempts',
   'details.attempts': (n) => `${n} ${n === 1 ? 'attempt' : 'attempts'}`,
   'details.open': 'Open in Canvas',
+  'discard.button': 'Dismiss',
+  'discard.closed': 'Can no longer be submitted',
+  'discard.done': 'Task dismissed',
+  'discard.undo': 'Undo',
 
   'banner.settings': 'Settings',
   'banner.retry': 'Retry',

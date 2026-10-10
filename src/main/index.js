@@ -16,7 +16,7 @@ const {
   tokenDaysLeft,
 } = require('./config');
 const { createTokenStore } = require('./token-store');
-const { createCanvasClient } = require('./canvas-api');
+const { createCanvasClient, byDue } = require('./canvas-api');
 const { isDemo, demoItems, demoDetails } = require('./demo');
 const { notifyDue, warnTokenExpiry } = require('./notifications');
 const { createTray } = require('./tray');
@@ -47,6 +47,8 @@ let win = null;
 let timer = null;
 let quitting = false;
 let inFlight = null;
+/** Pendientes descartados en esta sesión (id → pendiente), para poder deshacer. */
+const discarded = new Map();
 
 /* ---------- utilidades ---------- */
 
@@ -262,6 +264,19 @@ async function getDetails(id) {
   return DEMO ? demoDetails(item) : client.fetchDetails(item);
 }
 
+/** Descarta (marca completado en Canvas) o restaura un pendiente y lo saca o devuelve a la lista. */
+async function setComplete(id, complete) {
+  const item = complete ? cache.items.find((x) => x.id === id) : discarded.get(id);
+  if (!item) throw new AppError('unknown', t('error.itemNotFound'));
+  if (!DEMO) item.overrideId = await (complete ? client.markComplete(item) : client.unmarkComplete(item));
+  const rest = cache.items.filter((x) => x.id !== id);
+  if (complete) discarded.set(id, item);
+  else discarded.delete(id);
+  cache.items = complete ? rest : [...rest, item].sort(byDue);
+  tray.update(cache.items.length);
+  return sendState();
+}
+
 async function saveSettings(input) {
   const { config: next, token } = validateSettings(input, config);
   if (token) {
@@ -287,6 +302,13 @@ function registerIpc() {
       return { ok: true, details: await getDetails(String(id)) };
     } catch (e) {
       return { ok: false, error: e.message };
+    }
+  });
+  ipcMain.handle('set-complete', async (_e, id, complete) => {
+    try {
+      return { ok: true, state: await setComplete(String(id), Boolean(complete)) };
+    } catch (e) {
+      return { ok: false, error: e.message || t('error.unknown') };
     }
   });
   ipcMain.handle('open-url', (_e, url) => openSafe(String(url)));

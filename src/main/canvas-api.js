@@ -74,6 +74,7 @@ function normalizeItem(raw, now, baseUrl) {
     typeLabel: t(`type.${type}`),
     points: typeof p.points_possible === 'number' ? p.points_possible : null,
     overdue: new Date(due) < now,
+    overrideId: raw.planner_override?.id ?? null,
   };
 }
 
@@ -109,10 +110,27 @@ const byDue = (a, b) => new Date(a.due) - new Date(b.due);
 function createCanvasClient({ fetch, getConfig, getToken }) {
   const detailsCache = new Map();
 
-  /** GET con token; si la respuesta es una lista, sigue la paginación del header Link. */
-  async function get(apiPath) {
+  /** Petición con token a una URL del dominio configurado; traduce los errores a AppError. */
+  async function request(url, { method = 'GET', body } = {}) {
     const token = getToken();
     if (!token) throw new AppError('auth', t('error.noToken'));
+    const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json' };
+    if (body) headers['Content-Type'] = 'application/json';
+    let res;
+    try {
+      res = await fetch(url, { method, headers, body: body && JSON.stringify(body) });
+    } catch {
+      throw new AppError('network', t('error.offline'));
+    }
+    if (res.status === 401) throw new AppError('auth', t('error.tokenInvalid'));
+    if (res.status === 403) throw new AppError('auth', t('error.forbidden'));
+    if (!res.ok) throw new AppError('http', t('error.http', res.status));
+    return res;
+  }
+
+  /** GET con token; si la respuesta es una lista, sigue la paginación del header Link. */
+  async function get(apiPath) {
+    if (!getToken()) throw new AppError('auth', t('error.noToken'));
     const { baseUrl } = getConfig();
     const origin = new URL(baseUrl).origin;
     let url = new URL(apiPath, baseUrl).toString();
@@ -122,18 +140,7 @@ function createCanvasClient({ fetch, getConfig, getToken }) {
       // Nunca mandar el token fuera del dominio configurado.
       if (new URL(url).origin !== origin) break;
 
-      let res;
-      try {
-        res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-        });
-      } catch {
-        throw new AppError('network', t('error.offline'));
-      }
-      if (res.status === 401) throw new AppError('auth', t('error.tokenInvalid'));
-      if (res.status === 403) throw new AppError('auth', t('error.forbidden'));
-      if (!res.ok) throw new AppError('http', t('error.http', res.status));
-
+      const res = await request(url);
       const data = await res.json();
       if (!Array.isArray(data)) return data;
       out.push(...data);
@@ -189,7 +196,36 @@ function createCanvasClient({ fetch, getConfig, getToken }) {
     return details;
   }
 
-  return { get, fetchPending, fetchDetails };
+  /**
+   * Marca o desmarca un pendiente como completado en el planner de Canvas: crea el override
+   * (POST) o actualiza el que ya tiene (PUT). Devuelve el id del override.
+   */
+  async function setComplete(item, complete) {
+    const { baseUrl } = getConfig();
+    const overrideId = String(item.overrideId ?? '');
+    const plannableId = String(item.plannableId ?? '');
+    let res;
+    if (/^\d+$/.test(overrideId)) {
+      res = await request(new URL(`/api/v1/planner/overrides/${overrideId}`, baseUrl).toString(), {
+        method: 'PUT',
+        body: { marked_complete: complete },
+      });
+    } else if (/^\d+$/.test(plannableId)) {
+      res = await request(new URL('/api/v1/planner/overrides', baseUrl).toString(), {
+        method: 'POST',
+        body: { plannable_type: item.type, plannable_id: Number(plannableId), marked_complete: complete },
+      });
+    } else {
+      throw new AppError('unknown', t('error.itemNotFound'));
+    }
+    const data = await res.json();
+    return data?.id ?? item.overrideId ?? null;
+  }
+
+  const markComplete = (item) => setComplete(item, true);
+  const unmarkComplete = (item) => setComplete(item, false);
+
+  return { get, fetchPending, fetchDetails, markComplete, unmarkComplete };
 }
 
 module.exports = { nextLink, normalizeItem, htmlToText, byDue, createCanvasClient };

@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('canvas', {
   refresh: () => ipcRenderer.invoke('refresh'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   getDetails: (id) => ipcRenderer.invoke('get-details', id),
+  setComplete: (id, complete) => ipcRenderer.invoke('set-complete', id, complete),
   openUrl: (url) => ipcRenderer.invoke('open-url', url),
   openCanvas: () => ipcRenderer.invoke('open-canvas'),
   openLogin: () => ipcRenderer.invoke('open-login'),

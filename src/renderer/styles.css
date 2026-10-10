@@ -290,6 +290,11 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
 }
+/* Columna para que el aviso de deshacer quede abajo aunque la lista sea corta. */
+#view-list {
+  display: flex;
+  flex-direction: column;
+}
 .view::-webkit-scrollbar {
   width: 8px;
 }
@@ -430,8 +435,14 @@ select:focus-visible {
 .desc.muted {
   color: var(--text-3);
 }
-.open-btn {
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
   margin: 8px 0 2px;
+}
+.pill {
   padding: 3px 12px;
   font-size: 12px;
   font-weight: 500;
@@ -441,14 +452,65 @@ select:focus-visible {
   border: 1px solid var(--accent-border);
   border-radius: 999px;
 }
-.open-btn:hover {
+.pill:hover {
   background: linear-gradient(var(--accent-soft) 0 0), var(--glass-hover);
 }
-.open-btn:active {
+.pill.danger {
+  color: var(--red-head);
+  background: linear-gradient(color-mix(in srgb, var(--red) 14%, transparent) 0 0), var(--glass);
+  border-color: color-mix(in srgb, var(--red) 45%, transparent);
+}
+.pill.danger:hover {
+  background: linear-gradient(color-mix(in srgb, var(--red) 22%, transparent) 0 0), var(--glass-hover);
+}
+.pill:active {
   background: var(--active);
 }
+.closed {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* Tarjeta descartada: se desvanece y cierra su hueco (la altura inicial la fija renderer.js). */
+.item.leaving {
+  max-height: 0 !important;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-block: 0;
+  border-width: 0;
+  opacity: 0;
+  transform: translateX(24px);
+  pointer-events: none;
+  transition: all 220ms ease;
+}
+
+.toast {
+  position: sticky;
+  bottom: 8px;
+  margin: auto 12px 0;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--glass-hover);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+.toast span {
+  flex: 1;
+}
+#toast-btn::before {
+  content: '· ';
+  color: var(--text-3);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .extra {
+  .extra,
+  .item.leaving {
     transition: none;
   }
 }

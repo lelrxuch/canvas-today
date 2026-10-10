@@ -31,7 +31,12 @@ test('normalizeItem convierte un elemento del planner', () => {
     typeLabel: 'Tarea',
     points: 10,
     overdue: false,
+    overrideId: null,
   });
+  assert.equal(
+    normalizeItem(raw({ planner_override: { id: 5, marked_complete: false } }), NOW, BASE).overrideId,
+    5,
+  );
 });
 
 test('normalizeItem descarta tipos no soportados, sin fecha y ya entregados', () => {
@@ -146,4 +151,49 @@ test('get traduce errores HTTP a AppError con código', async () => {
   await assert.rejects(client(fetch).get('/a'), { code: 'auth' });
   await assert.rejects(client(fetch).get('/b'), { code: 'http', message: 'Canvas respondió con error 500.' });
   await assert.rejects(client(fetch).get('/c'), { code: 'network' });
+});
+
+/** fetch falso que registra método y cuerpo, y responde con `body`. */
+function recordingFetch(body, status = 200) {
+  const calls = [];
+  const fetch = async (url, init) => {
+    calls.push({ url, method: init.method, body: init.body && JSON.parse(init.body) });
+    return { status, ok: status < 400, json: async () => body, headers: { get: () => null } };
+  };
+  return { fetch, calls };
+}
+
+const item = { type: 'assignment', plannableId: 42, overrideId: null };
+
+test('markComplete crea el override con POST si no existe', async () => {
+  const { fetch, calls } = recordingFetch({ id: 99, marked_complete: true });
+  assert.equal(await client(fetch).markComplete(item), 99);
+  assert.deepEqual(calls, [
+    {
+      url: `${BASE}/api/v1/planner/overrides`,
+      method: 'POST',
+      body: { plannable_type: 'assignment', plannable_id: 42, marked_complete: true },
+    },
+  ]);
+});
+
+test('markComplete y unmarkComplete actualizan con PUT el override existente', async () => {
+  const { fetch, calls } = recordingFetch({ id: 99 });
+  const c = client(fetch);
+  assert.equal(await c.markComplete({ ...item, overrideId: 99 }), 99);
+  assert.equal(await c.unmarkComplete({ ...item, overrideId: 99 }), 99);
+  assert.deepEqual(
+    calls.map((x) => [x.method, x.url, x.body.marked_complete]),
+    [
+      ['PUT', `${BASE}/api/v1/planner/overrides/99`, true],
+      ['PUT', `${BASE}/api/v1/planner/overrides/99`, false],
+    ],
+  );
+});
+
+test('markComplete propaga errores y rechaza ids no numéricos', async () => {
+  await assert.rejects(client(recordingFetch({}, 500).fetch).markComplete(item), { code: 'http' });
+  const { fetch, calls } = recordingFetch({});
+  await assert.rejects(client(fetch).markComplete({ ...item, plannableId: '1/../x' }), { code: 'unknown' });
+  assert.equal(calls.length, 0);
 });

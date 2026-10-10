@@ -46,6 +46,9 @@ const TOKEN_CHIP_DAYS = 14;
 const TOKEN_CHIP_URGENT_DAYS = 3;
 /** Canvas usa -1 para intentos ilimitados. */
 const UNLIMITED_ATTEMPTS = -1;
+/** Duración de la salida de una tarjeta descartada (igual que en styles.css) y del aviso para deshacer. */
+const LEAVE_MS = 220;
+const TOAST_MS = 6000;
 const COURSE_PALETTE = [
   '#007aff',
   '#34c759',
@@ -101,6 +104,8 @@ function loadDetails(item, card) {
     if (n === UNLIMITED_ATTEMPTS) attempts = t('details.unlimitedAttempts');
     else if (n > 0) attempts = t('details.attempts', n);
     card.querySelector('.attempts').textContent = attempts;
+    const closed = card.querySelector('.closed');
+    if (closed && lockAt && new Date(lockAt) < new Date()) closed.textContent = t('discard.closed');
   });
 }
 
@@ -156,20 +161,80 @@ function renderItem(item, now) {
   facts.append(el('span', 'pts', item.points !== null ? t('points', item.points) : ''));
   facts.append(el('span', 'attempts'), el('span', 'lock'));
   inner.append(facts, el('p', 'desc', t('loading')));
+  const actions = el('div', 'actions');
   if (item.url) {
-    const open = el('button', 'open-btn', t('details.open'));
+    const open = el('button', 'pill', t('details.open'));
     open.type = 'button';
     open.addEventListener('click', (e) => {
       e.stopPropagation();
       api.openUrl(item.url);
     });
-    inner.append(open);
+    actions.append(open);
   }
+  if (item.overdue) {
+    const drop = el('button', 'pill danger', t('discard.button'));
+    drop.type = 'button';
+    drop.addEventListener('click', (e) => {
+      e.stopPropagation();
+      discard(card, item);
+    });
+    actions.append(drop, el('span', 'closed'));
+  }
+  if (actions.childElementCount) inner.append(actions);
   extra.append(inner);
 
   card.append(dot, body, due, extra);
   setExpanded(card, item, item.id === expandedId);
   return card;
+}
+
+/* ---------- descartar ---------- */
+
+let toastTimer = null;
+
+function hideToast() {
+  clearTimeout(toastTimer);
+  $('#toast').hidden = true;
+}
+
+/** Aviso abajo durante TOAST_MS, con una acción opcional (Deshacer). */
+function showToast(text, action, onAction) {
+  $('#toast-text').textContent = text;
+  const btn = $('#toast-btn');
+  btn.hidden = !action;
+  btn.textContent = action || '';
+  btn.onclick = () => {
+    hideToast();
+    onAction();
+  };
+  $('#toast').hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, TOAST_MS);
+}
+
+/** Colapsa la tarjeta, la saca con una animación y la marca completada en Canvas; si falla, vuelve. */
+async function discard(card, item) {
+  expandedId = null;
+  setExpanded(card, item, false);
+  card.style.maxHeight = `${card.offsetHeight}px`;
+  void card.offsetHeight; // fija la altura de partida antes de animar
+  card.classList.add('leaving');
+  const [r] = await Promise.all([
+    api.setComplete(item.id, true),
+    new Promise((ok) => setTimeout(ok, LEAVE_MS)),
+  ]);
+  if (!r.ok) {
+    card.classList.remove('leaving');
+    card.style.maxHeight = '';
+    showToast(r.error);
+    return;
+  }
+  render(r.state);
+  showToast(t('discard.done'), t('discard.undo'), async () => {
+    const u = await api.setComplete(item.id, false);
+    if (u.ok) render(u.state);
+    else showToast(u.error);
+  });
 }
 
 function renderSummary(s, now) {
