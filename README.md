@@ -28,6 +28,12 @@ Ejecuta `Canvas-Today-Setup-<versión>.exe`. Instala solo para tu usuario, sin p
 administrador, y deja elegir la carpeta. El vidrio usa el acrílico del sistema (Windows 11 22H2 o posterior)
 y el color de acento sale de Configuración → Personalización → Colores.
 
+El instalador no está firmado, así que SmartScreen puede mostrar "Windows protegió tu PC": haz clic en
+**Más información → Ejecutar de todos modos**.
+
+El soporte para Windows está en pruebas. Si encuentras un problema, repórtalo en
+[Issues](https://github.com/lelrxuch/canvas-today/issues).
+
 ## Primer uso
 
 1. Se abre Ajustes.
@@ -112,3 +118,47 @@ src/
     └── styles.css
 test/                     pruebas node:test
 ```
+
+## Aviso
+
+Proyecto independiente, sin afiliación con Instructure. Canvas es marca de Instructure, Inc.
+
+## English
+
+Desktop widget for Linux and Windows 11 that shows your Canvas to-dos (assignments, quizzes, discussions and
+grades) grouped by day, with reminders before they're due.
+
+<p>
+  <img src="docs/screenshots/lista.png" width="250" alt="To-do list" />
+  <img src="docs/screenshots/tarjeta.png" width="250" alt="Expanded card" />
+  <img src="docs/screenshots/ajustes.png" width="250" alt="Settings" />
+</p>
+
+### Install
+
+Download the latest version from [Releases](https://github.com/lelrxuch/canvas-today/releases).
+
+**Linux:** `chmod +x Canvas-Today-*.AppImage` and run it. If it fails because of FUSE on Fedora:
+`sudo dnf install fuse-libs`.
+
+**Windows 11:** run `Canvas-Today-Setup-<version>.exe`. It installs for your user only, without admin rights.
+The installer isn't code-signed, so SmartScreen may show "Windows protected your PC": click **More info →
+Run anyway**.
+
+Windows support is in testing. If you find a problem, please report it in
+[Issues](https://github.com/lelrxuch/canvas-today/issues).
+
+### Canvas token
+
+1. In Canvas, go to Account → Settings → New Access Token, and set an expiration date.
+2. In the app's Settings, enter your school's Canvas address (e.g. `yourschool.instructure.com`), paste the
+   token and set the same expiration date. The app reminds you 7 days before it expires.
+
+### Privacy
+
+The token is encrypted with the system keychain (when available) and is only sent to your Canvas address.
+The app has no telemetry and doesn't talk to any other server.
+
+### Disclaimer
+
+Canvas Today is not affiliated with or endorsed by Instructure, Inc. Canvas is a trademark of Instructure, Inc.
