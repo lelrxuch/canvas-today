@@ -1,24 +1,29 @@
 'use strict';
 
 const { execFile, spawn } = require('node:child_process');
+const path = require('node:path');
 const { nativeImage, nativeTheme, screen } = require('electron');
-const { dominantHue, accentFrom } = require('./color');
+const { dominantHue, wallTones } = require('./color');
+const { isDemo } = require('./demo');
 
 /*
  * Vidrio simulado: la ventana es transparente y el renderer pinta el fondo de pantalla de GNOME
  * desplazado según la posición de la ventana. De ese fondo también sale el color de acento.
  */
 
-/** Lado del muestreo para calcular el tono dominante (48×48 = 2304 píxeles). */
+/** Lado del muestreo para el tono dominante y el color promedio (48×48 = 2304 píxeles). */
 const SAMPLE_PX = 48;
 /** El fondo se manda a media resolución de la pantalla: basta para un desenfoque. */
 const WALLPAPER_SCALE = 0.5;
 const WALLPAPER_JPEG_QUALITY = 80;
+/** El modo demo usa un degradado incluido para que las capturas no dependan del escritorio. */
+const DEMO_WALLPAPER = path.join(__dirname, '../../assets/demo-wallpaper.png');
 
 /* ---------- fondo de GNOME ---------- */
 
 /** Ruta del wallpaper actual (variante clara u oscura según el tema), o null. */
 function wallpaperPath() {
+  if (isDemo()) return Promise.resolve(DEMO_WALLPAPER);
   const key = nativeTheme.shouldUseDarkColors ? 'picture-uri-dark' : 'picture-uri';
   return new Promise((resolve) => {
     execFile('gsettings', ['get', 'org.gnome.desktop.background', key], (err, out) => {
@@ -35,8 +40,9 @@ function wallpaperPath() {
 }
 
 /**
- * Fondo para la pantalla donde está `bounds`: { url } como data URL JPEG más el acento,
- * o { url: null } si no hay wallpaper legible.
+ * Fondo para la pantalla donde está `bounds`: { url } como data URL JPEG más el análisis de la
+ * muestra para el tinte y el acento ({ dom, tones }, ver color.glassStyle), o { url: null } si no
+ * hay wallpaper legible.
  */
 async function loadWallpaper(bounds) {
   try {
@@ -48,7 +54,8 @@ async function loadWallpaper(bounds) {
     const sample = img.resize({ width: SAMPLE_PX, height: SAMPLE_PX }).toBitmap();
     return {
       url: `data:image/jpeg;base64,${jpeg.toString('base64')}`,
-      ...accentFrom(dominantHue(sample), nativeTheme.shouldUseDarkColors),
+      dom: dominantHue(sample),
+      tones: wallTones(sample),
     };
   } catch {
     return { url: null };

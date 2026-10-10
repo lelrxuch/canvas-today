@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('canvas', {
   minimize: () => ipcRenderer.invoke('minimize'),
   togglePin: () => ipcRenderer.invoke('toggle-pin'),
   quit: () => ipcRenderer.invoke('quit'),
+  previewOpacity: (level) => ipcRenderer.invoke('preview-opacity', level),
   onState: (cb) => listen('state', cb),
   onWallpaper: (cb) => listen('wallpaper', cb),
   onGeometry: (cb) => listen('geometry', cb),

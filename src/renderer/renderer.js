@@ -266,7 +266,11 @@ function renderList(s) {
   for (const [key, items] of agenda.groupItems(s.items, now)) {
     if (!items.length) continue;
     const head = el('div', `section-head ${key === 'overdue' ? 'overdue' : ''}`.trim());
-    head.append(el('span', '', t(`group.${key}`)), el('span', 'count', String(items.length)));
+    // "Atrasadas" va como píldora roja con texto blanco, igual que "Hace 2 d".
+    head.append(
+      el('span', key === 'overdue' ? 'tag' : '', t(`group.${key}`)),
+      el('span', 'count', String(items.length)),
+    );
     list.append(head);
     for (const it of items) list.append(renderItem(it, now));
   }
@@ -313,7 +317,6 @@ function renderFooter(s) {
 }
 
 function applyLook(cfg) {
-  document.documentElement.style.setProperty('--alpha', String(cfg.opacity));
   const pin = $('#btn-pin');
   pin.classList.toggle('on', cfg.alwaysOnTop);
   pin.title = t(cfg.alwaysOnTop ? 'pin.on' : 'pin.off');
@@ -356,7 +359,7 @@ function fillForm(s) {
   setSelect(f.daysAhead, c.daysAhead);
   setSelect(f.refreshMinutes, c.refreshMinutes);
   for (const r of f.querySelectorAll('input[name=theme]')) r.checked = r.value === c.theme;
-  f.opacity.value = c.opacity;
+  f.tintLevel.value = c.tintLevel;
   f.alwaysOnTop.checked = c.alwaysOnTop;
   f.autostart.checked = c.autostart;
 
@@ -384,7 +387,10 @@ function closeSettings() {
   $('#view-list').hidden = false;
   $('#title').textContent = t('title.list');
   $('#btn-settings').classList.remove('active');
-  if (current) render(current);
+  if (current) {
+    render(current);
+    previewOpacity(current.config.tintLevel); // deshace la vista previa si no se guardó
+  }
 }
 
 async function saveSettings(e) {
@@ -399,7 +405,7 @@ async function saveSettings(e) {
     daysAhead: Number(f.daysAhead.value),
     refreshMinutes: Number(f.refreshMinutes.value),
     theme: f.querySelector('input[name=theme]:checked')?.value || 'system',
-    opacity: Number(f.opacity.value),
+    tintLevel: Number(f.tintLevel.value),
     alwaysOnTop: f.alwaysOnTop.checked,
     autostart: f.autostart.checked,
   };
@@ -448,9 +454,7 @@ $('#btn-login').addEventListener('click', () => api.openLogin());
 $('#btn-cancel').addEventListener('click', closeSettings);
 $('#btn-quit').addEventListener('click', () => api.quit());
 $('#form').addEventListener('submit', saveSettings);
-$('#form').opacity.addEventListener('input', (e) => {
-  document.documentElement.style.setProperty('--alpha', e.target.value);
-});
+$('#form').tintLevel.addEventListener('input', (e) => previewOpacity(e.target.value));
 document.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey;
   if (e.key === 'Escape') {
@@ -470,11 +474,14 @@ document.addEventListener('keydown', (e) => {
 api.onState(render);
 
 const rootStyle = document.documentElement.style;
-api.onWallpaper(({ url, accent, accentSoft, accentBorder }) => {
-  if (url) rootStyle.setProperty('--wall', `url("${url}")`);
-  else rootStyle.removeProperty('--wall');
-  // Sin acento (fondo casi gris o sin wallpaper) queda el neutro de styles.css.
+
+/** Tinte, acento y colores de texto calculados en main. Lo que falta (fondo gris) queda como en styles.css. */
+function applyGlass({ tint, text3, redHead, lateBg, accent, accentSoft, accentBorder }) {
   const vars = [
+    ['--tint', tint],
+    ['--text-3', text3],
+    ['--red-head', redHead],
+    ['--late-bg', lateBg],
     ['--accent', accent],
     ['--accent-soft', accentSoft],
     ['--accent-border', accentBorder],
@@ -483,6 +490,20 @@ api.onWallpaper(({ url, accent, accentSoft, accentBorder }) => {
     if (v) rootStyle.setProperty(k, v);
     else rootStyle.removeProperty(k);
   }
+}
+
+/** Respuestas fuera de orden se descartan: gana la última posición del control. */
+let previewSeq = 0;
+async function previewOpacity(value) {
+  const seq = ++previewSeq;
+  const style = await api.previewOpacity(Number(value));
+  if (seq === previewSeq) applyGlass(style);
+}
+
+api.onWallpaper((backdrop) => {
+  if (backdrop.url) rootStyle.setProperty('--wall', `url("${backdrop.url}")`);
+  else rootStyle.removeProperty('--wall');
+  applyGlass(backdrop);
 });
 api.onGeometry(({ x, y, width, height }) => {
   rootStyle.setProperty('--wx', `${x}px`);

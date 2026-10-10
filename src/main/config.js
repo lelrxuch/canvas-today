@@ -21,7 +21,8 @@ const DEFAULTS = {
   daysAhead: 14,
   overdueDays: 14,
   theme: 'system',
-  opacity: 0.92,
+  /** Control de Opacidad normalizado: 0 = tinte mínimo legible, 1 = tinte opaco (color.tintAlpha). */
+  tintLevel: 0.3,
   alwaysOnTop: false,
   bounds: null,
 };
@@ -33,7 +34,7 @@ const LIMITS = {
   notifyHours: [1, 48],
   refreshMinutes: [5, 120],
   daysAhead: [1, 60],
-  opacity: [0.6, 1],
+  tintLevel: [0, 1],
 };
 
 const THEMES = ['system', 'light', 'dark'];
@@ -61,10 +62,25 @@ function writePrivate(file, data) {
 function createStore(dir) {
   const file = (name) => path.join(dir, name);
   return {
-    loadConfig: () => readJson(file(CONFIG_FILE), DEFAULTS),
+    loadConfig: () => migrateConfig(readJson(file(CONFIG_FILE), DEFAULTS)),
     loadState: () => readJson(file(STATE_FILE), DEFAULT_STATE),
     saveConfig: (config) => writePrivate(file(CONFIG_FILE), JSON.stringify(config, null, 2)),
     saveState: (state) => writePrivate(file(STATE_FILE), JSON.stringify(state, null, 2)),
+  };
+}
+
+/**
+ * Hasta 1.0 se guardaba `opacity` (0.6–1) y el alfa del tinte era (opacidad − 0.5) × 0.8 en
+ * oscuro. Se pasa a `tintLevel` con ese mismo alfa como nivel (con un wallpaper oscuro el mínimo
+ * legible es 0, así que se ve parecido).
+ */
+function migrateConfig(config) {
+  if (!('opacity' in config)) return config;
+  const { opacity, ...rest } = config;
+  const level = Math.round((Number(opacity) - 0.5) * 0.8 * 100) / 100;
+  return {
+    ...rest,
+    tintLevel: Number.isFinite(level) ? Math.min(1, Math.max(0, level)) : DEFAULTS.tintLevel,
   };
 }
 
@@ -144,6 +160,7 @@ module.exports = {
   DEFAULTS,
   LIMITS,
   createStore,
+  migrateConfig,
   migrateLegacyFiles,
   writePrivate,
   validateSettings,

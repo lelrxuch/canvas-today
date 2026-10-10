@@ -1,6 +1,5 @@
 :root {
-  --alpha: 0.92;
-  --bg: rgba(246, 246, 248, var(--alpha));
+  --bg: rgba(246, 246, 248, 0.92);
   --surface: rgba(255, 255, 255, 0.78);
   --hover: rgba(0, 0, 0, 0.045);
   --active: rgba(0, 0, 0, 0.08);
@@ -20,9 +19,13 @@
   /* Desplazamiento + desenfoque ≤ 10px (padding del body): si no, la ventana recorta la sombra
      y se ve un recuadro gris de bordes duros sobre fondos claros. */
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.08);
-  /* --alpha (control de Opacidad, 0.6–1) gobierna la intensidad del tinte. */
-  --tint: rgba(255, 255, 255, calc((var(--alpha) - 0.5) * 0.5));
+  /* Main reemplaza --tint, --text-3, --red-head, --late-bg y el acento según el wallpaper y el
+     control de Opacidad (color.js, glassStyle); estos valores solo se ven hasta ese primer mensaje. */
+  --tint: rgba(255, 255, 255, 0.3);
+  --late-bg: rgba(255, 69, 58, 0.9);
   --wall-fallback: linear-gradient(135deg, #a1c4fd, #f5c6e8);
+  /* Brillo diagonal del panel. En oscuro es tenue: al 0.28 ni un tinte opaco deja el texto a 7:1. */
+  --sheen: rgba(255, 255, 255, 0.28);
   --glass: rgba(255, 255, 255, 0.12);
   --glass-hover: rgba(255, 255, 255, 0.24);
   --glass-edge: rgba(255, 255, 255, 0.25);
@@ -52,7 +55,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: rgba(30, 30, 32, var(--alpha));
+    --bg: rgba(30, 30, 32, 0.92);
     --surface: rgba(255, 255, 255, 0.06);
     --hover: rgba(255, 255, 255, 0.06);
     --active: rgba(255, 255, 255, 0.1);
@@ -67,11 +70,12 @@
     --on-accent: #1c1c1e;
     --red: #ff453a;
     --orange: #ff9f0a;
-    --red-head: #ff8a80;
+    --red-head: #ff7266;
     --edge: rgba(255, 255, 255, 0.14);
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
-    --tint: rgba(28, 28, 30, calc((var(--alpha) - 0.5) * 0.8));
+    --tint: rgba(28, 28, 30, 0.3);
     --wall-fallback: linear-gradient(135deg, #1e2a4a, #4a2545);
+    --sheen: rgba(255, 255, 255, 0.08);
     color-scheme: dark;
   }
   body {
@@ -162,7 +166,7 @@ select:focus-visible {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 45%), var(--tint);
+  background: linear-gradient(135deg, var(--sheen), transparent 45%), var(--tint);
   pointer-events: none;
 }
 
@@ -335,7 +339,6 @@ select:focus-visible {
   font-weight: 600;
   color: var(--text-2);
 }
-.section-head.overdue,
 .summary .late {
   color: var(--red-head);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -455,16 +458,27 @@ select:focus-visible {
 .pill:hover {
   background: linear-gradient(var(--accent-soft) 0 0), var(--glass-hover);
 }
-.pill.danger {
-  color: var(--red-head);
-  background: linear-gradient(color-mix(in srgb, var(--red) 14%, transparent) 0 0), var(--glass);
-  border-color: color-mix(in srgb, var(--red) 45%, transparent);
+/* Rojo sólido (--late-bg, alfa 0.9) con texto blanco, como "Hace 2 d". Sin desenfoque: el blur
+   del fondo mezcla el texto blanco cercano y aclara la píldora. Al pasar el cursor se oscurece:
+   aclarar bajaría el contraste del blanco. */
+.pill.danger,
+.pill.danger:hover {
+  color: #fff;
+  font-weight: 600;
+  text-shadow: none;
+  background: var(--late-bg);
+  backdrop-filter: none;
+  border-color: transparent;
 }
 .pill.danger:hover {
-  background: linear-gradient(color-mix(in srgb, var(--red) 22%, transparent) 0 0), var(--glass-hover);
+  filter: brightness(0.9);
 }
 .pill:active {
   background: var(--active);
+}
+.pill.danger:active {
+  background: var(--late-bg);
+  filter: brightness(0.8);
 }
 .closed {
   font-size: 12px;
@@ -523,7 +537,8 @@ select:focus-visible {
   padding-top: 1px;
 }
 .due.soon,
-.due.late {
+.due.late,
+.section-head .tag {
   color: #fff;
   font-weight: 600;
   padding: 1px 7px;
@@ -533,8 +548,9 @@ select:focus-visible {
 .due.soon {
   background: rgba(255, 159, 10, 0.85);
 }
-.due.late {
-  background: rgba(255, 69, 58, 0.85);
+.due.late,
+.section-head .tag {
+  background: var(--late-bg);
 }
 
 .empty {

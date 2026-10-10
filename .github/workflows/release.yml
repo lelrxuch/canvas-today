@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            script: dist
+            file: dist/*.AppImage
+          - os: windows-latest
+            script: dist:win
+            file: dist/*.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      # electron-builder no publica: build.publish es null en package.json.
+      - run: npm run ${{ matrix.script }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.os }}
+          path: ${{ matrix.file }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: out
+          merge-multiple: true
+      - name: Checksums
+        working-directory: out
+        run: sha256sum * > SHA256SUMS.txt
+      - name: Notas desde CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            /^## \[|^\[[^]]+\]: / { if (found) exit; if (index($0, "## [" v "]") == 1) { found = 1; next } }
+            found
+          ' CHANGELOG.md > notes.md
+          test -s notes.md || { echo "CHANGELOG.md no tiene la sección [$version]"; exit 1; }
+      - name: Crear release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" out/* --title "Canvas Today $GITHUB_REF_NAME" --notes-file notes.md --verify-tag

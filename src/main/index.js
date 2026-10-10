@@ -7,6 +7,7 @@ const { app, BrowserWindow, ipcMain, shell, nativeTheme, screen, net } = require
 const i18n = require('./i18n');
 const { t } = i18n;
 const { AppError } = require('./errors');
+const { glassStyle } = require('./color');
 const {
   DEFAULTS,
   LIMITS,
@@ -113,7 +114,7 @@ function publicState() {
       refreshMinutes: config.refreshMinutes,
       daysAhead: config.daysAhead,
       theme: config.theme,
-      opacity: config.opacity,
+      tintLevel: config.tintLevel,
       alwaysOnTop: config.alwaysOnTop,
       autostart: autostart.isEnabled(),
     },
@@ -180,9 +181,23 @@ function toggleWindow() {
   else showWindow();
 }
 
+/** Fondo y análisis del último wallpaper, para recalcular tinte y acento sin volver a leerlo. */
+let backdrop = { url: null };
+
+/**
+ * { url, tint, accent, text3, ... } para un nivel del control de Opacidad. Sin wallpaper (Windows o
+ * gsettings sin fondo) se calcula sobre el vidrio fijo del tema; el acento de Windows llega hecho.
+ */
+function backdropStyle(level) {
+  const { url, dom = null, tones, ...systemAccent } = backdrop;
+  const style = glassStyle(dom, tones && tones.length ? tones : null, nativeTheme.shouldUseDarkColors, level);
+  return { url, ...style, ...systemAccent };
+}
+
 async function sendBackdrop() {
   if (!win || win.isDestroyed()) return;
-  send('wallpaper', await platform.loadBackdrop(win.getBounds()));
+  backdrop = await platform.loadBackdrop(win.getBounds());
+  send('wallpaper', backdropStyle(config.tintLevel));
 }
 
 /** Posición de la ventana dentro de su pantalla, para alinear el fondo simulado. */
@@ -287,6 +302,7 @@ async function saveSettings(input) {
   store.saveConfig(config);
   nativeTheme.themeSource = config.theme;
   if (win) win.setAlwaysOnTop(config.alwaysOnTop);
+  send('wallpaper', backdropStyle(config.tintLevel)); // tinte y acento dependen del nivel
   autostart.setEnabled(Boolean(input && input.autostart));
   restartTimer();
   cache.error = null;
@@ -323,6 +339,16 @@ function registerIpc() {
     return sendState();
   });
   ipcMain.handle('quit', quit);
+  // Vista previa del control de Opacidad: tinte y acento sin el fondo (el renderer ya lo tiene).
+  ipcMain.handle('preview-opacity', (_e, value) => {
+    const [min, max] = LIMITS.tintLevel;
+    const level = Number(value);
+    const style = backdropStyle(
+      Number.isFinite(level) ? Math.min(max, Math.max(min, level)) : config.tintLevel,
+    );
+    delete style.url;
+    return style;
+  });
   ipcMain.handle('save-settings', async (_e, input) => {
     try {
       return { ok: true, state: await saveSettings(input) };

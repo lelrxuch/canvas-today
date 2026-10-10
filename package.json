@@ -1,11 +1,19 @@
 {
   "name": "canvas-today",
   "productName": "Canvas Today",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Widget de escritorio con tus pendientes de Canvas",
   "main": "src/main/index.js",
   "author": "Cristopher Contreras",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lelrxuch/canvas-today.git"
+  },
+  "homepage": "https://github.com/lelrxuch/canvas-today#readme",
+  "bugs": {
+    "url": "https://github.com/lelrxuch/canvas-today/issues"
+  },
   "desktopName": "canvas-today.desktop",
   "scripts": {
     "start": "electron .",

@@ -3,13 +3,21 @@
 Widget de escritorio para Linux y Windows 11 con tus pendientes de Canvas: tareas, exámenes, foros y notas,
 agrupados por día, con avisos antes del vencimiento. Interfaz en español o inglés según el idioma del sistema.
 
+<p>
+  <img src="docs/screenshots/lista.png" width="250" alt="Lista de pendientes" />
+  <img src="docs/screenshots/tarjeta.png" width="250" alt="Tarjeta expandida" />
+  <img src="docs/screenshots/ajustes.png" width="250" alt="Ajustes" />
+</p>
+
+Descarga la última versión en [Releases](https://github.com/lelrxuch/canvas-today/releases).
+
 ## Instalar
 
 ### Linux
 
 ```bash
-chmod +x Canvas-Today-1.0.0.AppImage
-./Canvas-Today-1.0.0.AppImage
+chmod +x Canvas-Today-*.AppImage
+./Canvas-Today-*.AppImage
 ```
 
 Si falla por FUSE en Fedora: `sudo dnf install fuse-libs`.
@@ -23,10 +31,10 @@ y el color de acento sale de Configuración → Personalización → Colores.
 ## Primer uso
 
 1. Se abre Ajustes.
-2. Dirección de Canvas: el dominio de la UMG (lo que ves en la barra del navegador al entrar a Canvas, sin `https://`).
+2. Dirección de Canvas: el dominio de tu institución, p. ej. `tuescuela.instructure.com` (lo que ves en la barra del navegador al entrar a Canvas, sin `https://`).
 3. Token: pégalo desde Canvas (Cuenta → Configuración → Nuevo token de acceso). Si venías de una versión
    anterior, el token de `~/.config/canvas-widget/token` se migra solo.
-4. Vence el: fecha de vencimiento del token (7 ene 2027).
+4. Vence el: fecha de vencimiento que elegiste al crear el token.
 5. Guardar.
 
 ## Cada 90 días

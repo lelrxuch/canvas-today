@@ -76,7 +76,10 @@ function setup() {
   if (IS_WINDOWS) app.setAppUserModelId(APP_USER_MODEL_ID);
 }
 
-/** Fondo y acento para el renderer: { url, accent, accentSoft, accentBorder }. */
+/**
+ * Fondo para el renderer. Windows: { url: null, accent, accentSoft, accentBorder }. Linux: { url, dom,
+ * tones }, de donde index.js calcula tinte y acento según la opacidad (color.glassStyle).
+ */
 async function loadBackdrop(bounds) {
   if (IS_WINDOWS) {
     return {
