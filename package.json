@@ -1,0 +1,38 @@
+{
+  "name": "canvas-today",
+  "productName": "Canvas Today",
+  "version": "1.0.0",
+  "description": "Widget de escritorio con tus pendientes de Canvas",
+  "main": "src/main.js",
+  "author": "Cristopher Contreras",
+  "license": "MIT",
+  "desktopName": "canvas-today.desktop",
+  "scripts": {
+    "start": "electron .",
+    "demo": "CANVAS_TODAY_DEMO=1 electron .",
+    "dist": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "gt.cris.canvastoday",
+    "productName": "Canvas Today",
+    "publish": null,
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Education",
+      "icon": "assets/icon.png",
+      "artifactName": "Canvas-Today-${version}.AppImage",
+      "synopsis": "Tus pendientes de Canvas en el escritorio"
+    }
+  }
+}
