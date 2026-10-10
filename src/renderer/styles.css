@@ -709,3 +709,75 @@ input[type='range'] {
   font-weight: 500;
   white-space: nowrap;
 }
+
+/* ---------- Windows 11 ---------- */
+
+/* El acrílico del sistema cubre toda la ventana: sin margen, sin wallpaper simulado y con
+   sombra y esquinas del sistema. Controles a la derecha estilo Fluent: minimizar, fijar, cerrar. */
+.platform-win32 body {
+  padding: 0;
+  font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif;
+}
+.platform-win32 .panel {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.platform-win32 .panel::before {
+  content: none;
+}
+.platform-win32 .titlebar {
+  grid-template-columns: 1fr auto auto;
+  align-items: start;
+  padding-right: 0;
+}
+.platform-win32 .title {
+  justify-self: start;
+  align-self: center;
+}
+.platform-win32 .tools {
+  align-self: center;
+  margin-right: 4px;
+}
+.platform-win32 .lights {
+  order: 1;
+  gap: 0;
+}
+.platform-win32 .light {
+  width: 46px;
+  height: 32px;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.platform-win32 .light.min {
+  order: 0;
+}
+.platform-win32 .light.pin {
+  order: 1;
+}
+.platform-win32 .light.close {
+  order: 2;
+}
+.platform-win32 .light:hover {
+  background: var(--hover);
+}
+.platform-win32 .light:active {
+  background: var(--active);
+}
+.platform-win32 .light.close:hover {
+  background: #c42b1c;
+}
+.platform-win32 .light.pin.on {
+  background: var(--accent-soft);
+}
+.platform-win32 .light svg {
+  width: 10px;
+  height: 10px;
+  stroke: var(--text);
+  stroke-width: 1;
+  opacity: 1;
+}
+.platform-win32 .light.close:hover svg {
+  stroke: #fff;
+}

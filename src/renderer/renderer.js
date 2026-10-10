@@ -5,6 +5,9 @@
 const api = window.canvas;
 const $ = (sel) => document.querySelector(sel);
 
+// styles.css ajusta controles de ventana, vidrio y tipografía con .platform-win32 / .platform-linux.
+document.documentElement.classList.add(`platform-${api.platform}`);
+
 /* ---------- idioma ---------- */
 
 const DICTS = { es: I18N_ES, en: I18N_EN };

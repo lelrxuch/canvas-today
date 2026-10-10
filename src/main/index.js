@@ -2,7 +2,6 @@
 
 const path = require('node:path');
 const os = require('node:os');
-const { spawn } = require('node:child_process');
 const { app, BrowserWindow, ipcMain, shell, nativeTheme, screen, net } = require('electron');
 
 const i18n = require('./i18n');
@@ -22,7 +21,7 @@ const { isDemo, demoItems, demoDetails } = require('./demo');
 const { notifyDue, warnTokenExpiry } = require('./notifications');
 const { createTray } = require('./tray');
 const autostart = require('./autostart');
-const { loadWallpaper, watchWallpaper } = require('./wallpaper');
+const platform = require('./platform');
 
 const APP_NAME = 'Canvas Today';
 const DEMO = isDemo();
@@ -34,7 +33,7 @@ const MINUTE_MS = 60 * 1000;
 const WINDOW = { width: 380, height: 600, minWidth: 320, minHeight: 360, margin: 12 };
 const SAVE_BOUNDS_DELAY_MS = 600;
 const GEOMETRY_THROTTLE_MS = 50;
-const WALLPAPER_DEBOUNCE_MS = 300;
+const BACKDROP_DEBOUNCE_MS = 300;
 
 let store = null;
 let tokens = null;
@@ -179,9 +178,9 @@ function toggleWindow() {
   else showWindow();
 }
 
-async function sendWallpaper() {
+async function sendBackdrop() {
   if (!win || win.isDestroyed()) return;
-  send('wallpaper', await loadWallpaper(win.getBounds()));
+  send('wallpaper', await platform.loadBackdrop(win.getBounds()));
 }
 
 /** Posición de la ventana dentro de su pantalla, para alinear el fondo simulado. */
@@ -206,9 +205,7 @@ function createWindow() {
     minWidth: WINDOW.minWidth,
     minHeight: WINDOW.minHeight,
     frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
-    hasShadow: false,
+    ...platform.windowOptions(process.platform),
     alwaysOnTop: config.alwaysOnTop,
     show: false,
     title: APP_NAME,
@@ -219,8 +216,12 @@ function createWindow() {
       sandbox: true,
       nodeIntegration: false,
       spellcheck: false,
-      // El preload lee el idioma de aquí: en sandbox no tiene acceso a app.getLocale().
-      additionalArguments: [`--canvas-today-lang=${locale.lang}`, `--canvas-today-intl=${locale.intlLocale}`],
+      // El preload lee idioma y plataforma de aquí: en sandbox no tiene acceso a app.getLocale().
+      additionalArguments: [
+        `--canvas-today-lang=${locale.lang}`,
+        `--canvas-today-intl=${locale.intlLocale}`,
+        `--canvas-today-platform=${process.platform}`,
+      ],
     },
   });
 
@@ -240,7 +241,7 @@ function createWindow() {
   }
   win.webContents.on('did-finish-load', () => {
     sendGeometry();
-    sendWallpaper();
+    sendBackdrop();
   });
   win.on('close', (e) => {
     if (!quitting) {
@@ -313,6 +314,7 @@ function registerIpc() {
 
 function start() {
   app.setName(APP_NAME);
+  platform.setup();
   locale = i18n.init(app.getLocale());
 
   const dir = app.getPath('userData');
@@ -327,7 +329,7 @@ function start() {
   nativeTheme.themeSource = config.theme;
   registerIpc();
   createWindow();
-  const stopWatching = watchWallpaper(debounce(sendWallpaper, WALLPAPER_DEBOUNCE_MS));
+  const stopWatching = platform.watchBackdrop(debounce(sendBackdrop, BACKDROP_DEBOUNCE_MS));
   app.on('will-quit', stopWatching);
   tray = createTray({
     icon: ICON,
@@ -344,28 +346,7 @@ function start() {
   restartTimer();
 }
 
-// En Linux se necesita X11: en Wayland no funcionan "Mantener encima" ni la posición del vidrio.
-// appendSwitch('ozone-platform') llega tarde en Electron 44 (la plataforma ya se eligió), así que
-// se relanza una vez con el flag. El valor del switch antes de tocarlo es la plataforma efectiva.
-// No se usa app.relaunch: su proceso auxiliar vive dentro del montaje de la AppImage, que
-// desaparece al salir, y la app nunca vuelve a abrir.
-function needsX11Relaunch() {
-  return (
-    process.platform === 'linux' &&
-    app.commandLine.getSwitchValue('ozone-platform') !== 'x11' &&
-    Boolean(process.env.DISPLAY) && // sin XWayland no hay X11 al que cambiar
-    !process.env.CANVAS_TODAY_X11_RELAUNCH
-  );
-}
-
-if (needsX11Relaunch()) {
-  spawn(process.env.APPIMAGE || process.execPath, [...process.argv.slice(1), '--ozone-platform=x11'], {
-    detached: true,
-    // fd 3 es el pipe con el que el runtime de la AppImage sabe que la app terminó; si se hereda,
-    // la instancia original y su montaje nunca se cierran. 'ignore' no lo reemplaza; 'pipe' sí.
-    stdio: ['ignore', 'ignore', 'ignore', 'pipe'],
-    env: { ...process.env, CANVAS_TODAY_X11_RELAUNCH: '1' },
-  }).unref();
+if (platform.relaunchInX11IfNeeded()) {
   app.exit(0);
 } else if (!app.requestSingleInstanceLock()) {
   app.quit();

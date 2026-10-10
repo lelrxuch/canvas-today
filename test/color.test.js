@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { rgbToHsl, hslToRgb, contrast, dominantHue, accentFrom } = require('../src/main/wallpaper');
+const { rgbToHsl, hslToRgb, contrast, dominantHue, accentFrom } = require('../src/main/color');
 
 const rgbOf = (css) => css.match(/\d+/g).map(Number);
 const GLASS_DARK = [0x2c, 0x2c, 0x30];

@@ -1,9 +1,11 @@
 # Canvas Today
 
-Widget de escritorio para Linux con tus pendientes de Canvas: tareas, exámenes, foros y notas,
+Widget de escritorio para Linux y Windows 11 con tus pendientes de Canvas: tareas, exámenes, foros y notas,
 agrupados por día, con avisos antes del vencimiento. Interfaz en español o inglés según el idioma del sistema.
 
 ## Instalar
+
+### Linux
 
 ```bash
 chmod +x Canvas-Today-1.0.0.AppImage
@@ -11,6 +13,12 @@ chmod +x Canvas-Today-1.0.0.AppImage
 ```
 
 Si falla por FUSE en Fedora: `sudo dnf install fuse-libs`.
+
+### Windows 11
+
+Ejecuta `Canvas-Today-Setup-<versión>.exe`. Instala solo para tu usuario, sin pedir permisos de
+administrador, y deja elegir la carpeta. El vidrio usa el acrílico del sistema (Windows 11 22H2 o posterior)
+y el color de acento sale de Configuración → Personalización → Colores.
 
 ## Primer uso
 
@@ -27,14 +35,15 @@ Genera un token nuevo en Canvas, pégalo en Ajustes → Token y actualiza la fec
 
 ## Archivos
 
-En `~/.config/Canvas Today/` (el directorio `userData` de Electron):
+En el directorio `userData` de Electron: `~/.config/Canvas Today/` en Linux, `%APPDATA%\Canvas Today\` en Windows.
 
 - `token.enc` — token cifrado con el llavero del sistema (libsecret/KWallet en Linux, DPAPI en Windows)
-- `token` — solo si no hay llavero disponible: texto plano con permisos 600
+- `token` — solo si no hay llavero disponible (Linux): texto plano con permisos 600
 - `config.json` — ajustes
 - `state.json` — avisos ya enviados
 
-Además, `~/.config/autostart/canvas-today.desktop` si activas "Iniciar con el sistema".
+"Iniciar con el sistema" crea `~/.config/autostart/canvas-today.desktop` en Linux; en Windows registra la app
+en el inicio de sesión del usuario (`app.setLoginItemSettings`).
 
 La primera vez se migran los archivos de `~/.config/canvas-widget/` (versión 1.0); el token antiguo en texto
 plano se borra después de comprobar que la copia nueva se lee bien.
@@ -44,15 +53,16 @@ plano se borra después de comprobar que la copia nueva se lee bien.
 - `Ctrl+R` actualizar
 - `Ctrl+,` ajustes
 - `Esc` ocultar
-- Botón verde: mantener encima
+- Botón verde (Linux) o el del medio (Windows): mantener encima
 
-## GNOME
+## Linux (GNOME)
 
 El ícono de bandeja requiere la extensión AppIndicator:
 `sudo dnf install gnome-shell-extension-appindicator`, luego cierra sesión y vuelve a entrar.
 Sin ella la app funciona igual; para volver a mostrar la ventana, ejecuta la AppImage otra vez.
 
-En Wayland, GNOME no deja que la app elija su posición en pantalla.
+La app corre siempre en X11: si arranca en Wayland, se relanza sola con `--ozone-platform=x11` (en Wayland
+GNOME no deja elegir posición ni mantener encima).
 
 ## Desarrollo
 
@@ -64,6 +74,7 @@ npm test              # pruebas de lógica pura con node:test
 npm run lint          # ESLint
 npm run format        # Prettier (format:check solo revisa)
 npm run dist          # genera la AppImage en dist/
+npm run dist:win      # genera el instalador NSIS de Windows en dist/ (desde Linux requiere Wine)
 ```
 
 ### Estructura
@@ -75,14 +86,16 @@ src/
 │   ├── canvas-api.js     cliente HTTP, paginación por header Link, normalizeItem
 │   ├── config.js         config.json/state.json, validación de Ajustes
 │   ├── token-store.js    token con safeStorage o archivo 600, migración
-│   ├── wallpaper.js      fondo de GNOME para el vidrio y color de acento
+│   ├── platform.js       todo lo que cambia entre Linux y Windows: vidrio, acento, X11, AppUserModelId
+│   ├── color.js          tono dominante y acento con contraste ≥ 4.5:1 (puro)
+│   ├── wallpaper.js      fondo de GNOME para el vidrio simulado (solo Linux)
 │   ├── notifications.js  avisos de vencimiento y de token
 │   ├── tray.js           ícono y menú de bandeja
-│   ├── autostart.js      inicio automático (XDG)
+│   ├── autostart.js      inicio automático (XDG en Linux, login items en Windows)
 │   ├── demo.js           datos del modo demo
 │   ├── i18n.js           idioma según app.getLocale()
 │   └── errors.js         AppError con código
-├── preload.js            puente window.canvas
+├── preload.js            puente window.canvas (idioma y plataforma)
 └── renderer/
     ├── index.html
     ├── renderer.js       DOM y eventos

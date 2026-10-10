@@ -4,6 +4,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { safeStorage } = require('electron');
 const { writePrivate } = require('./config');
+const { IS_LINUX, IS_WINDOWS } = require('./platform');
 
 const ENCRYPTED_FILE = 'token.enc';
 const PLAIN_FILE = 'token';
@@ -16,7 +17,7 @@ const GROUP_OTHER_BITS = 0o077;
  */
 function encryptionAvailable() {
   if (!safeStorage.isEncryptionAvailable()) return false;
-  return process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text';
+  return !IS_LINUX || safeStorage.getSelectedStorageBackend() !== 'basic_text';
 }
 
 function readPlain(file) {
@@ -30,7 +31,8 @@ function readPlain(file) {
 /**
  * Guarda el token de Canvas en `dir` (userData).
  * - Con safeStorage: `token.enc`, cifrado.
- * - Sin safeStorage: `token` en texto plano con permisos 600.
+ * - Sin safeStorage: `token` en texto plano con permisos 600. En Windows safeStorage (DPAPI)
+ *   siempre está disponible; si no, el archivo queda protegido por las ACL del perfil.
  * `legacyFile` es el token de versiones anteriores (~/.config/canvas-widget/token); se migra
  * la primera vez y se borra solo después de comprobar que la copia nueva se lee igual.
  * Usar después de app.whenReady().
@@ -89,7 +91,8 @@ function createTokenStore(dir, legacyFile) {
     const exists = read().length > 0;
     const encrypted = exists && encryptionAvailable() && fs.existsSync(encryptedFile);
     let safePerms = true;
-    if (exists && !encrypted) {
+    // En Windows los bits de modo no reflejan las ACL (stat siempre da 0o666): no se revisan.
+    if (exists && !encrypted && !IS_WINDOWS) {
       try {
         safePerms = (fs.statSync(plainFile).mode & GROUP_OTHER_BITS) === 0;
       } catch {

@@ -11,6 +11,7 @@ function arg(name) {
 
 contextBridge.exposeInMainWorld('canvas', {
   locale: { lang: arg('canvas-today-lang'), intlLocale: arg('canvas-today-intl') },
+  platform: arg('canvas-today-platform'),
   getState: () => ipcRenderer.invoke('get-state'),
   refresh: () => ipcRenderer.invoke('refresh'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),

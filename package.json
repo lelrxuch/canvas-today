@@ -14,7 +14,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "node --test",
-    "dist": "electron-builder --linux AppImage"
+    "dist": "electron-builder --linux AppImage",
+    "dist:win": "electron-builder --win nsis"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -42,6 +43,22 @@
       "icon": "assets/icon.png",
       "artifactName": "Canvas-Today-${version}.AppImage",
       "synopsis": "Tus pendientes de Canvas en el escritorio"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "Canvas-Today-Setup-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "shortcutName": "Canvas Today"
     }
   }
 }

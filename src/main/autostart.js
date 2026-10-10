@@ -4,17 +4,29 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const { app } = require('electron');
+const { IS_WINDOWS } = require('./platform');
 
 /** Entrada XDG de inicio automático (GNOME y la mayoría de escritorios Linux). */
 const AUTOSTART_FILE = path.join(os.homedir(), '.config', 'autostart', 'canvas-today.desktop');
 /** Segundos que GNOME espera tras iniciar sesión, para que la bandeja ya esté lista. */
 const START_DELAY_S = 10;
 
+/** En desarrollo (`electron .`) Windows debe lanzar electron.exe con la ruta de la app. */
+function loginItem() {
+  return app.isPackaged ? {} : { path: process.execPath, args: [app.getAppPath()] };
+}
+
 function isEnabled() {
+  if (IS_WINDOWS) return app.getLoginItemSettings(loginItem()).openAtLogin;
   return fs.existsSync(AUTOSTART_FILE);
 }
 
+/** Windows: registro de inicio de sesión del usuario. Linux: entrada XDG. */
 function setEnabled(on) {
+  if (IS_WINDOWS) {
+    app.setLoginItemSettings({ ...loginItem(), openAtLogin: on });
+    return;
+  }
   if (!on) {
     fs.rmSync(AUTOSTART_FILE, { force: true });
     return;
