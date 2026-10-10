@@ -21,6 +21,7 @@ const I18N_EN = {
   'error.noBaseUrl': 'The Canvas address is missing.',
   'error.noToken': 'No token saved.',
   'error.offline': 'Cannot reach Canvas.',
+  'error.timeout': 'Canvas took too long to respond.',
   'error.tokenInvalid': 'The token is invalid or has expired.',
   'error.forbidden': 'Canvas denied access with this token.',
   'error.http': (status) => `Canvas responded with error ${status}.`,

@@ -7,6 +7,18 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Unreleased]
 
+### Fixed
+
+- La lista dejaba de actualizarse si una petición a Canvas se quedaba colgada (por ejemplo, al volver de
+  suspensión o al cambiar de red). Ahora cada petición tiene un límite de 20 s.
+- Se actualiza al volver de suspensión, al desbloquear la sesión y al mostrar la ventana si los datos
+  tienen más de un intervalo.
+
+### Added
+
+- Modo diagnóstico (`CANVAS_TODAY_DIAGNOSE=1`): compara el planner con las tareas de cada curso activo y
+  guarda en el directorio de datos qué tareas faltan en el planner y por qué se descartó cada elemento.
+
 ## [1.1.0] - 2026-10-10
 
 ### Added

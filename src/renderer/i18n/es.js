@@ -24,6 +24,7 @@ const I18N_ES = {
   'error.noBaseUrl': 'Falta la dirección de Canvas.',
   'error.noToken': 'No hay token guardado.',
   'error.offline': 'Sin conexión con Canvas.',
+  'error.timeout': 'Canvas tardó demasiado en responder.',
   'error.tokenInvalid': 'El token no es válido o ya venció.',
   'error.forbidden': 'Canvas rechazó el acceso con este token.',
   'error.http': (status) => `Canvas respondió con error ${status}.`,

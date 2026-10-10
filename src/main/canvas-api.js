@@ -8,6 +8,8 @@ const { DAY_MS } = require('./config');
 const MAX_PAGES = 10;
 const PER_PAGE = 100;
 const DESCRIPTION_MAX_CHARS = 600;
+/** Una petición colgada (red caída tras suspender, Wi-Fi que cambia) bloquearía todas las actualizaciones. */
+const REQUEST_TIMEOUT_MS = 20_000;
 
 /** Tipos del planner que se muestran; el resto se ignora. */
 const SUPPORTED_TYPES = new Set([
@@ -38,19 +40,29 @@ function nextLink(header) {
 }
 
 /**
+ * Por qué un elemento del planner no se muestra, o null si se muestra.
+ * Separado de normalizeItem para que el diagnóstico explique cada descarte.
+ */
+function exclusionReason(raw) {
+  if (!SUPPORTED_TYPES.has(raw.plannable_type)) return 'unsupported_type';
+  const p = raw.plannable || {};
+  if (!(p.due_at || p.todo_date || raw.plannable_date)) return 'no_date';
+  const s = raw.submissions || {};
+  if (s.submitted) return 'submitted';
+  if (s.graded) return 'graded';
+  if (s.excused) return 'excused';
+  if (raw.planner_override && raw.planner_override.marked_complete) return 'marked_complete';
+  return null;
+}
+
+/**
  * Convierte un elemento de /api/v1/planner/items al formato de la lista.
  * Devuelve null si el tipo no se muestra, si no tiene fecha o si ya está entregado.
  */
 function normalizeItem(raw, now, baseUrl) {
-  if (!SUPPORTED_TYPES.has(raw.plannable_type)) return null;
+  if (exclusionReason(raw)) return null;
   const p = raw.plannable || {};
   const due = p.due_at || p.todo_date || raw.plannable_date;
-  if (!due) return null;
-
-  const s = raw.submissions || {};
-  const done =
-    s.submitted || s.graded || s.excused || (raw.planner_override && raw.planner_override.marked_complete);
-  if (done) return null;
 
   let url = null;
   if (raw.html_url) {
@@ -118,9 +130,15 @@ function createCanvasClient({ fetch, getConfig, getToken }) {
     if (body) headers['Content-Type'] = 'application/json';
     let res;
     try {
-      res = await fetch(url, { method, headers, body: body && JSON.stringify(body) });
-    } catch {
-      throw new AppError('network', t('error.offline'));
+      res = await fetch(url, {
+        method,
+        headers,
+        body: body && JSON.stringify(body),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch (e) {
+      const timedOut = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
+      throw new AppError('network', t(timedOut ? 'error.timeout' : 'error.offline'));
     }
     if (res.status === 401) throw new AppError('auth', t('error.tokenInvalid'));
     if (res.status === 403) throw new AppError('auth', t('error.forbidden'));
@@ -149,18 +167,30 @@ function createCanvasClient({ fetch, getConfig, getToken }) {
     return out;
   }
 
+  function plannerWindow(now, overdueDays, daysAhead) {
+    return {
+      start: new Date(now.getTime() - overdueDays * DAY_MS),
+      end: new Date(now.getTime() + daysAhead * DAY_MS),
+    };
+  }
+
+  async function fetchPlannerRaw(now, overdueDays, daysAhead) {
+    const { start, end } = plannerWindow(now, overdueDays, daysAhead);
+    const qs = new URLSearchParams({
+      start_date: start.toISOString(),
+      end_date: end.toISOString(),
+      per_page: String(PER_PAGE),
+    });
+    return get(`/api/v1/planner/items?${qs}`);
+  }
+
   /** Pendientes desde `overdueDays` atrás hasta `daysAhead` adelante, ordenados por fecha. */
   async function fetchPending(now = new Date()) {
     const { baseUrl, overdueDays, daysAhead } = getConfig();
     if (!baseUrl) throw new AppError('config', t('error.noBaseUrl'));
     if (!getToken()) throw new AppError('auth', t('error.noToken'));
 
-    const qs = new URLSearchParams({
-      start_date: new Date(now.getTime() - overdueDays * DAY_MS).toISOString(),
-      end_date: new Date(now.getTime() + daysAhead * DAY_MS).toISOString(),
-      per_page: String(PER_PAGE),
-    });
-    const raw = await get(`/api/v1/planner/items?${qs}`);
+    const raw = await fetchPlannerRaw(now, overdueDays, daysAhead);
     return raw
       .map((r) => normalizeItem(r, now, baseUrl))
       .filter(Boolean)
@@ -222,10 +252,83 @@ function createCanvasClient({ fetch, getConfig, getToken }) {
     return data?.id ?? item.overrideId ?? null;
   }
 
+  /**
+   * Compara el planner con las tareas de cada curso activo para encontrar las que Canvas no
+   * incluye en el planner, y explica por qué se descartó cada elemento que sí incluye.
+   * El resultado no contiene el token ni URLs con credenciales.
+   */
+  async function diagnose(now = new Date()) {
+    const { baseUrl, overdueDays, daysAhead } = getConfig();
+    if (!baseUrl) throw new AppError('config', t('error.noBaseUrl'));
+    const { start, end } = plannerWindow(now, overdueDays, daysAhead);
+
+    const planner = await fetchPlannerRaw(now, overdueDays, daysAhead);
+    const inPlanner = new Set();
+    for (const r of planner) {
+      const p = r.plannable || {};
+      const assignmentId = p.assignment_id ?? (r.plannable_type === 'assignment' ? r.plannable_id : null);
+      if (assignmentId !== null && assignmentId !== undefined) inPlanner.add(String(assignmentId));
+    }
+
+    const courses = await get('/api/v1/courses?enrollment_state=active&per_page=100');
+    const missing = [];
+    const courseInfo = [];
+    for (const c of courses) {
+      const info = {
+        id: c.id,
+        name: c.name || c.course_code || null,
+        enrollments: (c.enrollments || []).map((e) => `${e.type}:${e.enrollment_state}`),
+        assignmentsInWindow: 0,
+        error: null,
+      };
+      courseInfo.push(info);
+      if (!/^\d+$/.test(String(c.id))) continue;
+      let assignments;
+      try {
+        assignments = await get(
+          `/api/v1/courses/${c.id}/assignments?include[]=submission&order_by=due_at&per_page=${PER_PAGE}`,
+        );
+      } catch (e) {
+        info.error = e.code || 'unknown';
+        continue;
+      }
+      for (const a of assignments) {
+        if (!a.due_at) continue;
+        const due = new Date(a.due_at);
+        if (due < start || due > end) continue;
+        info.assignmentsInWindow += 1;
+        if (inPlanner.has(String(a.id))) continue;
+        missing.push({
+          course: info.name,
+          title: a.name,
+          due: a.due_at,
+          published: a.published ?? null,
+          submissionTypes: a.submission_types || [],
+          submission: a.submission?.workflow_state ?? null,
+          hasSubmittedSubmissions: a.has_submitted_submissions ?? null,
+        });
+      }
+    }
+
+    return {
+      generatedAt: now.toISOString(),
+      window: { start: start.toISOString(), end: end.toISOString() },
+      planner: planner.map((r) => ({
+        course: r.context_name || null,
+        type: r.plannable_type,
+        title: r.plannable?.title || r.plannable?.name || null,
+        due: r.plannable?.due_at || r.plannable?.todo_date || r.plannable_date || null,
+        excluded: exclusionReason(r),
+      })),
+      courses: courseInfo,
+      missingFromPlanner: missing,
+    };
+  }
+
   const markComplete = (item) => setComplete(item, true);
   const unmarkComplete = (item) => setComplete(item, false);
 
-  return { get, fetchPending, fetchDetails, markComplete, unmarkComplete };
+  return { get, fetchPending, fetchDetails, markComplete, unmarkComplete, diagnose };
 }
 
-module.exports = { nextLink, normalizeItem, htmlToText, byDue, createCanvasClient };
+module.exports = { nextLink, normalizeItem, exclusionReason, htmlToText, byDue, createCanvasClient };

@@ -2,7 +2,13 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { nextLink, normalizeItem, htmlToText, createCanvasClient } = require('../src/main/canvas-api');
+const {
+  nextLink,
+  normalizeItem,
+  exclusionReason,
+  htmlToText,
+  createCanvasClient,
+} = require('../src/main/canvas-api');
 
 const BASE = 'https://canvas.example.edu';
 const NOW = new Date('2026-10-14T16:00:00Z');
@@ -196,4 +202,71 @@ test('markComplete propaga errores y rechaza ids no numéricos', async () => {
   const { fetch, calls } = recordingFetch({});
   await assert.rejects(client(fetch).markComplete({ ...item, plannableId: '1/../x' }), { code: 'unknown' });
   assert.equal(calls.length, 0);
+});
+
+test('exclusionReason explica cada descarte', () => {
+  assert.equal(exclusionReason(raw()), null);
+  assert.equal(exclusionReason(raw({ plannable_type: 'calendar_event' })), 'unsupported_type');
+  assert.equal(exclusionReason(raw({ plannable: { title: 'x' } })), 'no_date');
+  assert.equal(exclusionReason(raw({ submissions: { submitted: true } })), 'submitted');
+  assert.equal(exclusionReason(raw({ submissions: { graded: true } })), 'graded');
+  assert.equal(exclusionReason(raw({ submissions: { excused: true } })), 'excused');
+  assert.equal(exclusionReason(raw({ planner_override: { marked_complete: true } })), 'marked_complete');
+});
+
+test('las peticiones llevan timeout y un timeout se reporta como error de red', async () => {
+  let signal;
+  const fetch = async (_url, init) => {
+    signal = init.signal;
+    throw new DOMException('timeout', 'TimeoutError');
+  };
+  await assert.rejects(client(fetch).get('/a'), {
+    code: 'network',
+    message: 'Canvas tardó demasiado en responder.',
+  });
+  assert.ok(signal instanceof AbortSignal);
+});
+
+test('diagnose lista las tareas de los cursos que faltan en el planner', async () => {
+  const config = { baseUrl: BASE, overdueDays: 14, daysAhead: 14 };
+  const day = 24 * 60 * 60 * 1000;
+  const qs = new URLSearchParams({
+    start_date: new Date(NOW.getTime() - 14 * day).toISOString(),
+    end_date: new Date(NOW.getTime() + 14 * day).toISOString(),
+    per_page: '100',
+  });
+  const { fetch } = fakeFetch({
+    [`${BASE}/api/v1/planner/items?${qs}`]: {
+      body: [raw(), raw({ plannable_id: 43, submissions: { submitted: true } })],
+    },
+    [`${BASE}/api/v1/courses?enrollment_state=active&per_page=100`]: {
+      body: [
+        { id: 7, name: 'Bases de Datos I', enrollments: [{ type: 'student', enrollment_state: 'active' }] },
+      ],
+    },
+    [`${BASE}/api/v1/courses/7/assignments?include[]=submission&order_by=due_at&per_page=100`]: {
+      body: [
+        { id: 42, name: 'Diagrama ER', due_at: '2026-10-15T05:59:00Z' },
+        { id: 43, name: 'Entregada', due_at: '2026-10-15T05:59:00Z' },
+        { id: 44, name: 'Plan de pruebas', due_at: '2026-10-14T22:00:00Z', published: true },
+        { id: 45, name: 'Fuera de rango', due_at: '2027-01-01T00:00:00Z' },
+        { id: 46, name: 'Sin fecha', due_at: null },
+      ],
+    },
+  });
+  const c = createCanvasClient({ fetch, getConfig: () => config, getToken: () => '1~abc' });
+  const d = await c.diagnose(NOW);
+
+  assert.deepEqual(
+    d.planner.map((p) => p.excluded),
+    [null, 'submitted'],
+  );
+  assert.deepEqual(d.courses, [
+    { id: 7, name: 'Bases de Datos I', enrollments: ['student:active'], assignmentsInWindow: 3, error: null },
+  ]);
+  assert.deepEqual(
+    d.missingFromPlanner.map((m) => m.title),
+    ['Plan de pruebas'],
+  );
+  assert.ok(!JSON.stringify(d).includes('1~abc'));
 });

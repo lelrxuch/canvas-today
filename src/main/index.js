@@ -2,7 +2,8 @@
 
 const path = require('node:path');
 const os = require('node:os');
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, screen, net } = require('electron');
+const fs = require('node:fs');
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, screen, net, powerMonitor } = require('electron');
 
 const i18n = require('./i18n');
 const { t } = i18n;
@@ -26,6 +27,9 @@ const platform = require('./platform');
 
 const APP_NAME = 'Canvas Today';
 const DEMO = isDemo();
+/** `CANVAS_TODAY_DIAGNOSE=1`: escribe un diagnóstico del planner y sale, sin abrir ventana. */
+const DIAGNOSE = process.env.CANVAS_TODAY_DIAGNOSE === '1';
+const DIAGNOSE_FILE = 'diagnostico-planner.json';
 const ICON = path.join(__dirname, '..', '..', 'assets', 'icon.png');
 /** Ubicación de versiones anteriores a 1.1; sus archivos se migran a userData. */
 const LEGACY_DIR = path.join(os.homedir(), '.config', 'canvas-widget');
@@ -160,10 +164,20 @@ function refresh() {
   return inFlight;
 }
 
+function refreshIntervalMs() {
+  const [minMinutes] = LIMITS.refreshMinutes;
+  return Math.max(minMinutes, config.refreshMinutes) * MINUTE_MS;
+}
+
 function restartTimer() {
   clearInterval(timer);
-  const [minMinutes] = LIMITS.refreshMinutes;
-  timer = setInterval(refresh, Math.max(minMinutes, config.refreshMinutes) * MINUTE_MS);
+  timer = setInterval(refresh, refreshIntervalMs());
+}
+
+/** Actualiza si los datos tienen más de un intervalo; para al volver de suspensión o al mostrar la ventana. */
+function refreshIfStale() {
+  const age = cache.fetchedAt ? Date.now() - new Date(cache.fetchedAt).getTime() : Infinity;
+  if (age >= refreshIntervalMs() || cache.error) refresh();
 }
 
 /* ---------- ventana ---------- */
@@ -173,6 +187,7 @@ function showWindow() {
   if (win.isMinimized()) win.restore();
   win.show();
   win.focus();
+  refreshIfStale();
 }
 
 function toggleWindow() {
@@ -392,9 +407,45 @@ function start() {
   });
   refresh();
   restartTimer();
+  // Tras suspender, el intervalo puede tardar hasta un ciclo completo en volver a dispararse.
+  for (const ev of ['resume', 'unlock-screen']) {
+    powerMonitor.on(ev, () => {
+      restartTimer();
+      refreshIfStale();
+    });
+  }
 }
 
-if (platform.relaunchInX11IfNeeded()) {
+/** Modo diagnóstico: compara el planner con las tareas de cada curso y guarda el resultado en userData. */
+async function runDiagnose() {
+  app.setName(APP_NAME);
+  i18n.init(app.getLocale());
+  const dir = app.getPath('userData');
+  const diagStore = createStore(dir);
+  const diagConfig = diagStore.loadConfig();
+  const diagTokens = createTokenStore(dir, path.join(LEGACY_DIR, 'token'));
+  const diagClient = createCanvasClient({
+    fetch: net.fetch,
+    getConfig: () => diagConfig,
+    getToken: diagTokens.read,
+  });
+  const file = path.join(dir, DIAGNOSE_FILE);
+  try {
+    const report = await diagClient.diagnose();
+    fs.writeFileSync(file, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+    console.log(`Diagnóstico guardado en ${file}`);
+    console.log(`Elementos en el planner: ${report.planner.length}`);
+    console.log(`Tareas que faltan en el planner: ${report.missingFromPlanner.length}`);
+  } catch (e) {
+    console.error(`Diagnóstico fallido: ${e.message}`);
+    process.exitCode = 1;
+  }
+  app.exit(process.exitCode ?? 0);
+}
+
+if (DIAGNOSE) {
+  app.whenReady().then(runDiagnose);
+} else if (platform.relaunchInX11IfNeeded()) {
   app.exit(0);
 } else if (!app.requestSingleInstanceLock()) {
   app.quit();
