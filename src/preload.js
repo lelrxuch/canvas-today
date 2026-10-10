@@ -2,7 +2,15 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
+/** Valor de un argumento --nombre=valor que el proceso principal pasa en additionalArguments. */
+function arg(name) {
+  const prefix = `--${name}=`;
+  const found = process.argv.find((a) => a.startsWith(prefix));
+  return found ? found.slice(prefix.length) : '';
+}
+
 contextBridge.exposeInMainWorld('canvas', {
+  locale: { lang: arg('canvas-today-lang'), intlLocale: arg('canvas-today-intl') },
   getState: () => ipcRenderer.invoke('get-state'),
   refresh: () => ipcRenderer.invoke('refresh'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
