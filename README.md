@@ -64,6 +64,7 @@ plano se borra después de comprobar que la copia nueva se lee bien.
 
 ## Atajos
 
+- `Ctrl+1` / `Ctrl+2` / `Ctrl+3` Inicio, Tareas y Notas
 - `Ctrl+N` nueva nota
 - `Ctrl+R` actualizar
 - `Ctrl+,` ajustes

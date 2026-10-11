@@ -151,6 +151,17 @@ const I18N_EN = {
   'note.errorDetailsLong': (n) => `Details can't be longer than ${n} characters.`,
   'note.errorDate': 'The date or time is not valid.',
   'note.errorCourse': 'Invalid course.',
+
+  // Tabs
+  'tab.home': 'Home',
+  'tab.tasks': 'Tasks',
+  'tab.notes': 'Notes',
+  'home.emptyTitle': 'Nothing urgent',
+  'home.emptyBody': 'Nothing overdue, due today or due tomorrow.',
+  'home.more': (n) => `${n} more in Tasks →`,
+  'notes.emptyTitle': 'No notes',
+  'notes.emptyBody': 'Create one with + or Ctrl+N.',
+  'notes.count': (n) => (n === 1 ? '1 note' : `${n} notes`),
 };
 
 if (typeof module === 'object') module.exports = I18N_EN;

@@ -42,6 +42,16 @@
         </div>
       </header>
 
+      <nav class="tabs" id="tabs" role="tablist">
+        <button type="button" class="tab" role="tab" data-tab="home" data-i18n="tab.home"></button>
+        <button type="button" class="tab" role="tab" data-tab="tasks">
+          <span data-i18n="tab.tasks"></span><span class="tab-count" id="count-tasks"></span>
+        </button>
+        <button type="button" class="tab" role="tab" data-tab="notes">
+          <span data-i18n="tab.notes"></span><span class="tab-count" id="count-notes"></span>
+        </button>
+      </nav>
+
       <section class="view" id="view-list">
         <div class="summary" id="summary"></div>
         <div class="banner" id="banner" hidden>

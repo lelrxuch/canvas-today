@@ -16,6 +16,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Added
 
+- Pestañas Inicio, Tareas y Notas (`Ctrl+1`, `Ctrl+2`, `Ctrl+3`). Inicio muestra solo lo atrasado, lo de hoy
+  y lo de mañana, con un enlace a las demás tareas; Tareas, las tareas de Canvas; Notas, tus notas.
+  La app recuerda la última pestaña.
 - Notas personales: botón + (o `Ctrl+N`) para crear notas con título, detalles, fecha, hora y curso
   opcionales. Se guardan como planner notes de Canvas, así que también se ven en la web y en la app móvil.
   Desde la tarjeta se editan o eliminan, con Deshacer.

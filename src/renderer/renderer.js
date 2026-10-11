@@ -64,6 +64,41 @@ const COURSE_PALETTE = [
 
 let current = null;
 let view = 'list';
+
+/* ---------- pestañas ---------- */
+
+const TABS = ['home', 'tasks', 'notes'];
+/** Inicio muestra solo lo urgente; el resto queda en Tareas. */
+const HOME_GROUPS = new Set(['overdue', 'today', 'tomorrow']);
+const TAB_KEY = 'canvas-today.tab';
+
+/** La pestaña se recuerda por comodidad; si el almacenamiento falla, se empieza en Inicio. */
+function loadTab() {
+  try {
+    const saved = localStorage.getItem(TAB_KEY);
+    return TABS.includes(saved) ? saved : 'home';
+  } catch {
+    return 'home';
+  }
+}
+
+let tab = loadTab();
+
+function setTab(name) {
+  if (!TABS.includes(name)) return;
+  tab = name;
+  try {
+    localStorage.setItem(TAB_KEY, name);
+  } catch {
+    /* sin almacenamiento: solo dura esta sesión */
+  }
+  expandedId = null;
+  if (view !== 'list') setView('list', t('title.list'));
+  else if (current) render(current);
+  $('#view-list').scrollTop = 0;
+}
+
+const isNote = (it) => it.type === 'planner_note';
 let expandedId = null;
 const details = new Map(); // id → promesa de { ok, details }
 
@@ -302,32 +337,77 @@ function renderSummary(s, now) {
   if (sub) box.append(el('small', '', sub));
 }
 
+function renderTabs(s) {
+  for (const btn of document.querySelectorAll('.tab')) {
+    btn.setAttribute('aria-selected', String(btn.dataset.tab === tab));
+  }
+  const notes = s.items.filter(isNote).length;
+  const tasks = s.items.length - notes;
+  $('#count-tasks').textContent = tasks ? String(tasks) : '';
+  $('#count-notes').textContent = notes ? String(notes) : '';
+}
+
+/** Pendientes de la pestaña actual y lo que se muestra si no hay ninguno. */
+function tabContent(s, now) {
+  if (tab === 'notes') {
+    return { items: s.items.filter(isNote), empty: [t('notes.emptyTitle'), t('notes.emptyBody')] };
+  }
+  if (tab === 'tasks') {
+    return {
+      items: s.items.filter((it) => !isNote(it)),
+      empty: [t('empty.title'), t('empty.body', s.config.daysAhead)],
+    };
+  }
+  const urgent = s.items.filter((it) => HOME_GROUPS.has(agenda.groupOf(it, now)));
+  return {
+    items: urgent,
+    empty: [t('home.emptyTitle'), t('home.emptyBody')],
+    // El enlace lleva a Tareas, así que solo cuenta tareas; las notas siguientes están en Notas.
+    rest: s.items.filter((it) => !isNote(it) && !urgent.includes(it)).length,
+  };
+}
+
 function renderList(s) {
   const now = new Date();
   const list = $('#list');
   list.replaceChildren();
-  renderSummary(s, now);
+  renderTabs(s);
+  const { items, empty, rest } = tabContent(s, now);
 
-  if (!s.items.length) {
-    if (s.fetchedAt && !s.error) {
-      const empty = el('div', 'empty');
-      empty.append(el('strong', '', t('empty.title')));
-      empty.append(document.createTextNode(t('empty.body', s.config.daysAhead)));
-      list.append(empty);
-    }
-    return;
+  if (tab === 'notes') {
+    const box = $('#summary');
+    box.replaceChildren();
+    if (s.fetchedAt || items.length) box.append(document.createTextNode(t('notes.count', items.length)));
+  } else {
+    // Inicio resume todo; Tareas, solo las tareas.
+    renderSummary({ ...s, items: tab === 'home' ? s.items : items }, now);
   }
 
-  for (const [key, items] of agenda.groupItems(s.items, now)) {
-    if (!items.length) continue;
-    const head = el('div', `section-head ${key === 'overdue' ? 'overdue' : ''}`.trim());
-    // "Atrasadas" va como píldora roja con texto blanco, igual que "Hace 2 d".
-    head.append(
-      el('span', key === 'overdue' ? 'tag' : '', t(`group.${key}`)),
-      el('span', 'count', String(items.length)),
-    );
-    list.append(head);
-    for (const it of items) list.append(renderItem(it, now));
+  if (!items.length) {
+    if (s.fetchedAt && !s.error) {
+      const box = el('div', 'empty');
+      box.append(el('strong', '', empty[0]), document.createTextNode(empty[1]));
+      list.append(box);
+    }
+  } else {
+    for (const [key, groupItems] of agenda.groupItems(items, now)) {
+      if (!groupItems.length) continue;
+      const head = el('div', `section-head ${key === 'overdue' ? 'overdue' : ''}`.trim());
+      // "Atrasadas" va como píldora roja con texto blanco, igual que "Hace 2 d".
+      head.append(
+        el('span', key === 'overdue' ? 'tag' : '', t(`group.${key}`)),
+        el('span', 'count', String(groupItems.length)),
+      );
+      list.append(head);
+      for (const it of groupItems) list.append(renderItem(it, now));
+    }
+  }
+
+  if (tab === 'home' && rest > 0) {
+    const more = el('button', 'link more', t('home.more', rest));
+    more.type = 'button';
+    more.addEventListener('click', () => setTab('tasks'));
+    list.append(more);
   }
 }
 
@@ -430,6 +510,7 @@ function setView(name, title) {
   const leavingSettings = view === 'settings' && name !== 'settings';
   view = name;
   for (const v of ['list', 'settings', 'note']) $(`#view-${v}`).hidden = v !== name;
+  $('#tabs').hidden = name !== 'list';
   $('#title').textContent = title;
   $('#btn-settings').classList.toggle('active', name === 'settings');
   $('#btn-note').classList.toggle('active', name === 'note');
@@ -609,6 +690,9 @@ $('#btn-refresh').addEventListener('click', doRefresh);
 $('#btn-settings').addEventListener('click', () => (view === 'settings' ? closeSettings() : openSettings()));
 $('#btn-note').addEventListener('click', () => (view === 'note' ? closeNote() : openNote()));
 $('#note-form').addEventListener('submit', saveNoteForm);
+for (const btn of document.querySelectorAll('.tab')) {
+  btn.addEventListener('click', () => setTab(btn.dataset.tab));
+}
 $('#btn-note-cancel').addEventListener('click', closeNote);
 $('#btn-note-delete').addEventListener('click', deleteNoteFromForm);
 $('#btn-open-canvas').addEventListener('click', () => api.openCanvas());
@@ -623,6 +707,11 @@ document.addEventListener('keydown', (e) => {
     if (view === 'settings') closeSettings();
     else if (view === 'note') closeNote();
     else api.hide();
+  }
+  // Ctrl+1/2/3: Inicio, Tareas, Notas.
+  if (mod && ['1', '2', '3'].includes(e.key)) {
+    e.preventDefault();
+    setTab(TABS[Number(e.key) - 1]);
   }
   if (mod && e.key.toLowerCase() === 'n') {
     e.preventDefault();

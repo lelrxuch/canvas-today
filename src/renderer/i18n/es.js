@@ -162,6 +162,17 @@ const I18N_ES = {
   'note.errorDetailsLong': (n) => `Los detalles no pueden pasar de ${n} caracteres.`,
   'note.errorDate': 'La fecha o la hora no son válidas.',
   'note.errorCourse': 'Curso no válido.',
+
+  // Pestañas
+  'tab.home': 'Inicio',
+  'tab.tasks': 'Tareas',
+  'tab.notes': 'Notas',
+  'home.emptyTitle': 'Nada urgente',
+  'home.emptyBody': 'No hay nada atrasado, para hoy ni para mañana.',
+  'home.more': (n) => `${n} más en Tareas →`,
+  'notes.emptyTitle': 'Sin notas',
+  'notes.emptyBody': 'Crea una con + o Ctrl+N.',
+  'notes.count': (n) => (n === 1 ? '1 nota' : `${n} notas`),
 };
 
 if (typeof module === 'object') module.exports = I18N_ES;
