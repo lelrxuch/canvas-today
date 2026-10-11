@@ -7,6 +7,8 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-10
+
 ### Fixed
 
 - La lista dejaba de actualizarse si una petición a Canvas se quedaba colgada (por ejemplo, al volver de

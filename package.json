@@ -1,7 +1,7 @@
 {
   "name": "canvas-today",
   "productName": "Canvas Today",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Widget de escritorio con tus pendientes de Canvas",
   "main": "src/main/index.js",
   "author": "Cristopher Contreras",
