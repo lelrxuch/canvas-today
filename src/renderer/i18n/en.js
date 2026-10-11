@@ -109,7 +109,8 @@ const I18N_EN = {
   'settings.tokenMissing': 'No token saved. Paste it below.',
   'settings.tokenUnsafe': 'Token saved, but other users can read it. Run chmod 600 on the file.',
   'settings.tokenEncrypted': 'Token saved encrypted in the system keyring.',
-  'settings.tokenFile': (file) => `Token saved in ${file}`,
+  'settings.tokenFile': (file) =>
+    `Token not encrypted in ${file} (only your user can read it). No system keyring is available.`,
   'settings.pending': 'To do',
   'settings.notifyHours': 'Notify before due',
   'settings.daysAhead': 'Show the next',

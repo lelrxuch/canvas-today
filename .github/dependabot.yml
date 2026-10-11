@@ -1,0 +1,12 @@
+# Avisos semanales de dependencias y acciones de GitHub con versiones nuevas o vulnerables.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

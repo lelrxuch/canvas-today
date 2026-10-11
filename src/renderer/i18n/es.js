@@ -120,7 +120,8 @@ const I18N_ES = {
   'settings.tokenUnsafe':
     'Token guardado, pero otros usuarios pueden leerlo. Ejecuta chmod 600 en el archivo.',
   'settings.tokenEncrypted': 'Token guardado cifrado en el llavero del sistema.',
-  'settings.tokenFile': (file) => `Token guardado en ${file}`,
+  'settings.tokenFile': (file) =>
+    `Token sin cifrar en ${file} (solo tu usuario puede leerlo). No hay llavero del sistema disponible.`,
   'settings.pending': 'Pendientes',
   'settings.notifyHours': 'Avisar antes de vencer',
   'settings.daysAhead': 'Mostrar los próximos',

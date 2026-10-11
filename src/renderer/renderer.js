@@ -480,7 +480,8 @@ function tokenStatus(token) {
   if (!token.exists) return { text: t('settings.tokenMissing'), warn: true };
   if (token.encrypted) return { text: t('settings.tokenEncrypted'), warn: false };
   if (!token.safePerms) return { text: t('settings.tokenUnsafe'), warn: true };
-  return { text: t('settings.tokenFile', token.file), warn: false };
+  // Sin llavero del sistema el token queda en texto plano (permisos 600): se avisa siempre.
+  return { text: t('settings.tokenFile', token.file), warn: true };
 }
 
 function fillForm(s) {
