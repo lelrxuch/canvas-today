@@ -87,6 +87,10 @@ function normalizeItem(raw, now, baseUrl) {
     points: typeof p.points_possible === 'number' ? p.points_possible : null,
     overdue: new Date(due) < now,
     overrideId: raw.planner_override?.id ?? null,
+    ...(type === 'planner_note' && {
+      details: p.details || '',
+      courseId: raw.course_id ?? p.course_id ?? null,
+    }),
   };
 }
 
@@ -325,10 +329,36 @@ function createCanvasClient({ fetch, getConfig, getToken }) {
     };
   }
 
+  /**
+   * Crea una nota personal en el planner de Canvas, o la actualiza si se pasa `noteId`.
+   * Las notas viven en Canvas: también se ven en la web y en la app móvil.
+   */
+  async function saveNote({ title, details, todoDate, courseId }, noteId = null) {
+    const { baseUrl } = getConfig();
+    const id = noteId === null ? '' : String(noteId);
+    if (id && !/^\d+$/.test(id)) throw new AppError('unknown', t('error.itemNotFound'));
+    const body = { title, details, todo_date: todoDate };
+    // En una actualización, un valor vacío desvincula la nota del curso.
+    if (courseId !== null) body.course_id = courseId;
+    else if (id) body.course_id = '';
+    const res = await request(new URL(`/api/v1/planner_notes${id ? `/${id}` : ''}`, baseUrl).toString(), {
+      method: id ? 'PUT' : 'POST',
+      body,
+    });
+    return res.json();
+  }
+
+  async function deleteNote(noteId) {
+    const { baseUrl } = getConfig();
+    const id = String(noteId ?? '');
+    if (!/^\d+$/.test(id)) throw new AppError('unknown', t('error.itemNotFound'));
+    await request(new URL(`/api/v1/planner_notes/${id}`, baseUrl).toString(), { method: 'DELETE' });
+  }
+
   const markComplete = (item) => setComplete(item, true);
   const unmarkComplete = (item) => setComplete(item, false);
 
-  return { get, fetchPending, fetchDetails, markComplete, unmarkComplete, diagnose };
+  return { get, fetchPending, fetchDetails, markComplete, unmarkComplete, saveNote, deleteNote, diagnose };
 }
 
 module.exports = { nextLink, normalizeItem, exclusionReason, htmlToText, byDue, createCanvasClient };

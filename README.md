@@ -64,9 +64,10 @@ plano se borra después de comprobar que la copia nueva se lee bien.
 
 ## Atajos
 
+- `Ctrl+N` nueva nota
 - `Ctrl+R` actualizar
 - `Ctrl+,` ajustes
-- `Esc` ocultar
+- `Esc` cerrar la vista actual u ocultar
 - Botón verde (Linux) o el del medio (Windows): mantener encima
 
 ## Linux (GNOME)

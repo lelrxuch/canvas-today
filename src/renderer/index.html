@@ -25,6 +25,9 @@
         </div>
         <div class="title" id="title" data-i18n="title.list"></div>
         <div class="tools">
+          <button class="tool" id="btn-note" data-i18n-title="btn.newNote">
+            <svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11" /></svg>
+          </button>
           <button class="tool" id="btn-refresh" data-i18n-title="btn.refresh">
             <svg viewBox="0 0 20 20"><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2" /></svg>
           </button>
@@ -50,6 +53,48 @@
           <span id="toast-text"></span>
           <button class="link" id="toast-btn" hidden></button>
         </div>
+      </section>
+
+      <section class="view settings" id="view-note" hidden>
+        <form id="note-form" autocomplete="off">
+          <div class="group">
+            <label class="row stacked">
+              <span class="label" data-i18n="note.title"></span>
+              <input type="text" name="title" maxlength="255" data-i18n-placeholder="note.titlePlaceholder" />
+            </label>
+            <label class="row stacked">
+              <span class="label" data-i18n="note.details"></span>
+              <textarea name="details" rows="4" maxlength="2000"></textarea>
+            </label>
+            <label class="row">
+              <span class="label" data-i18n="note.date"></span>
+              <input type="date" name="date" />
+            </label>
+            <label class="row">
+              <span class="label" data-i18n="note.time"></span>
+              <input type="time" name="time" />
+            </label>
+            <label class="row">
+              <span class="label" data-i18n="note.course"></span>
+              <select name="courseId"></select>
+            </label>
+          </div>
+          <p class="hint note-hint" data-i18n="note.syncHint"></p>
+
+          <p class="form-error" id="note-error" hidden></p>
+
+          <div class="form-actions">
+            <button
+              type="button"
+              class="btn delete"
+              id="btn-note-delete"
+              data-i18n="note.delete"
+              hidden
+            ></button>
+            <button type="button" class="btn" id="btn-note-cancel" data-i18n="settings.cancel"></button>
+            <button type="submit" class="btn primary" id="btn-note-save" data-i18n="settings.save"></button>
+          </div>
+        </form>
       </section>
 
       <section class="view settings" id="view-settings" hidden>

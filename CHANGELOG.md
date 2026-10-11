@@ -16,6 +16,9 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y e
 
 ### Added
 
+- Notas personales: botón + (o `Ctrl+N`) para crear notas con título, detalles, fecha, hora y curso
+  opcionales. Se guardan como planner notes de Canvas, así que también se ven en la web y en la app móvil.
+  Desde la tarjeta se editan o eliminan, con Deshacer.
 - Modo diagnóstico (`CANVAS_TODAY_DIAGNOSE=1`): compara el planner con las tareas de cada curso activo y
   guarda en el directorio de datos qué tareas faltan en el planner y por qué se descartó cada elemento.
 

@@ -270,3 +270,50 @@ test('diagnose lista las tareas de los cursos que faltan en el planner', async (
   );
   assert.ok(!JSON.stringify(d).includes('1~abc'));
 });
+
+test('normalizeItem agrega detalle y curso a las notas personales', () => {
+  const n = normalizeItem(
+    raw({
+      plannable_type: 'planner_note',
+      course_id: undefined,
+      context_name: undefined,
+      html_url: null,
+      plannable: { title: 'Repasar', details: 'Cap. 3', todo_date: '2026-10-15T05:59:00Z', course_id: 9 },
+    }),
+    NOW,
+    BASE,
+  );
+  assert.equal(n.details, 'Cap. 3');
+  assert.equal(n.courseId, 9);
+  assert.equal(normalizeItem(raw(), NOW, BASE).details, undefined);
+});
+
+test('saveNote crea con POST, actualiza con PUT y desvincula el curso con valor vacío', async () => {
+  const { fetch, calls } = recordingFetch({ id: 77 });
+  const c = client(fetch);
+  const note = { title: 'Repasar', details: '', todoDate: '2026-10-15T05:59:00.000Z', courseId: 7 };
+
+  assert.deepEqual(await c.saveNote(note), { id: 77 });
+  await c.saveNote({ ...note, courseId: null }, 77);
+  await c.saveNote({ ...note, courseId: null });
+
+  assert.deepEqual(calls[0], {
+    url: `${BASE}/api/v1/planner_notes`,
+    method: 'POST',
+    body: { title: 'Repasar', details: '', todo_date: '2026-10-15T05:59:00.000Z', course_id: 7 },
+  });
+  assert.equal(calls[1].url, `${BASE}/api/v1/planner_notes/77`);
+  assert.equal(calls[1].method, 'PUT');
+  assert.equal(calls[1].body.course_id, '');
+  assert.ok(!('course_id' in calls[2].body));
+  await assert.rejects(c.saveNote(note, '1/../2'), { code: 'unknown' });
+});
+
+test('deleteNote borra por id y rechaza ids no numéricos', async () => {
+  const { fetch, calls } = recordingFetch({});
+  const c = client(fetch);
+  await c.deleteNote(77);
+  assert.deepEqual(calls[0], { url: `${BASE}/api/v1/planner_notes/77`, method: 'DELETE', body: undefined });
+  await assert.rejects(c.deleteNote('x'), { code: 'unknown' });
+  assert.equal(calls.length, 1);
+});

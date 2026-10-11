@@ -18,6 +18,7 @@ const {
   tokenDaysLeft,
 } = require('./config');
 const { createTokenStore } = require('./token-store');
+const { validateNote } = require('./notes');
 const { createCanvasClient, byDue } = require('./canvas-api');
 const { isDemo, demoItems, demoDetails } = require('./demo');
 const { notifyDue, warnTokenExpiry } = require('./notifications');
@@ -54,6 +55,9 @@ let quitting = false;
 let inFlight = null;
 /** Pendientes descartados en esta sesión (id → pendiente), para poder deshacer. */
 const discarded = new Map();
+/** Notas creadas en modo demo; viven solo en memoria. */
+const demoNotes = new Map();
+let demoNoteSeq = 0;
 
 /* ---------- utilidades ---------- */
 
@@ -140,7 +144,7 @@ function refresh() {
   if (inFlight) return inFlight;
   inFlight = (async () => {
     try {
-      const items = DEMO ? demoItems() : await client.fetchPending();
+      const items = DEMO ? [...demoItems(), ...demoNotes.values()].sort(byDue) : await client.fetchPending();
       cache = { items, fetchedAt: new Date().toISOString(), error: null };
       if (!DEMO) {
         notifyDue(items, state, {
@@ -307,6 +311,50 @@ async function setComplete(id, complete) {
   return sendState();
 }
 
+/** Refresco que no reutiliza una petición iniciada antes de un cambio: esa traería datos viejos. */
+async function refreshAfterChange() {
+  if (inFlight) await inFlight;
+  return refresh();
+}
+
+function findNote(id) {
+  const item = cache.items.find((x) => x.id === id && x.type === 'planner_note');
+  if (!item) throw new AppError('unknown', t('error.itemNotFound'));
+  return item;
+}
+
+/** Crea la nota, o la actualiza si `input.id` es el id de una nota de la lista, y recarga. */
+async function saveNote(input) {
+  const note = validateNote(input);
+  const existing = input && input.id ? findNote(String(input.id)) : null;
+  if (DEMO) {
+    const id = existing ? existing.id : `demo-note-${(demoNoteSeq += 1)}`;
+    demoNotes.set(id, {
+      id,
+      title: note.title,
+      course: t('item.personalNote'),
+      due: note.todoDate,
+      url: null,
+      type: 'planner_note',
+      typeLabel: t('type.planner_note'),
+      points: null,
+      overdue: new Date(note.todoDate) < new Date(),
+      details: note.details,
+      courseId: null,
+    });
+  } else {
+    await client.saveNote(note, existing ? existing.plannableId : null);
+  }
+  return refreshAfterChange();
+}
+
+async function deleteNote(id) {
+  const item = findNote(id);
+  if (DEMO) demoNotes.delete(item.id);
+  else await client.deleteNote(item.plannableId);
+  return refreshAfterChange();
+}
+
 async function saveSettings(input) {
   const { config: next, token } = validateSettings(input, config);
   if (token) {
@@ -338,6 +386,20 @@ function registerIpc() {
   ipcMain.handle('set-complete', async (_e, id, complete) => {
     try {
       return { ok: true, state: await setComplete(String(id), Boolean(complete)) };
+    } catch (e) {
+      return { ok: false, error: e.message || t('error.unknown') };
+    }
+  });
+  ipcMain.handle('save-note', async (_e, input) => {
+    try {
+      return { ok: true, state: await saveNote(input) };
+    } catch (e) {
+      return { ok: false, error: e.message || t('error.unknown') };
+    }
+  });
+  ipcMain.handle('delete-note', async (_e, id) => {
+    try {
+      return { ok: true, state: await deleteNote(String(id)) };
     } catch (e) {
       return { ok: false, error: e.message || t('error.unknown') };
     }

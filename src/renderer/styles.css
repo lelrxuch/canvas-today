@@ -633,6 +633,8 @@ select:focus-visible {
 input[type='text'],
 input[type='password'],
 input[type='date'],
+input[type='time'],
+textarea,
 select {
   font: inherit;
   color: var(--text);
@@ -643,8 +645,14 @@ select {
   user-select: text;
 }
 input[type='text'],
-input[type='password'] {
+input[type='password'],
+textarea {
   width: 100%;
+}
+textarea {
+  resize: vertical;
+  min-height: 64px;
+  line-height: 1.4;
 }
 select {
   padding-right: 4px;
@@ -742,6 +750,26 @@ input[type='range'] {
 }
 .btn.primary:active {
   filter: brightness(0.92);
+}
+/* Eliminar nota: a la izquierda, separado de Cancelar/Guardar. Rojo sólido con texto blanco como
+   la píldora "Descartar" (≥ 4.5:1); un texto rojo sobre el vidrio no llega en todos los fondos. */
+.btn.delete,
+.btn.delete:hover {
+  margin-right: auto;
+  color: #fff;
+  font-weight: 600;
+  text-shadow: none;
+  background: var(--late-bg);
+}
+.btn.delete:hover {
+  filter: brightness(0.9);
+}
+.btn.delete:active {
+  filter: brightness(0.8);
+}
+
+.note-hint {
+  margin: 8px 22px 0;
 }
 
 .quit {

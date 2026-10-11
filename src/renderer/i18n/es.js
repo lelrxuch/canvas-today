@@ -140,6 +140,28 @@ const I18N_ES = {
   'unit.minutes': (n) => `${n} min`,
   'unit.hours': (n) => `${n} ${n === 1 ? 'hora' : 'horas'}`,
   'unit.days': (n) => `${n} ${n === 1 ? 'día' : 'días'}`,
+
+  // Notas personales (planner notes de Canvas)
+  'btn.newNote': 'Nueva nota (Ctrl+N)',
+  'title.newNote': 'Nueva nota',
+  'title.editNote': 'Editar nota',
+  'note.title': 'Título',
+  'note.titlePlaceholder': 'Estudiar capítulo 3',
+  'note.details': 'Detalles',
+  'note.date': 'Fecha',
+  'note.time': 'Hora',
+  'note.course': 'Curso',
+  'note.noCourse': 'Ninguno',
+  'note.syncHint': 'Se guarda en tu planner de Canvas: también la ves en la web y en la app móvil.',
+  'note.edit': 'Editar',
+  'note.delete': 'Eliminar',
+  'note.deleted': 'Nota eliminada',
+  'note.noDetails': 'Sin detalles',
+  'note.errorTitle': 'Escribe un título.',
+  'note.errorTitleLong': (n) => `El título no puede pasar de ${n} caracteres.`,
+  'note.errorDetailsLong': (n) => `Los detalles no pueden pasar de ${n} caracteres.`,
+  'note.errorDate': 'La fecha o la hora no son válidas.',
+  'note.errorCourse': 'Curso no válido.',
 };
 
 if (typeof module === 'object') module.exports = I18N_ES;

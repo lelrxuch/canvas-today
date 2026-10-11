@@ -129,6 +129,28 @@ const I18N_EN = {
   'unit.minutes': (n) => `${n} min`,
   'unit.hours': (n) => `${n} ${n === 1 ? 'hour' : 'hours'}`,
   'unit.days': (n) => `${n} ${n === 1 ? 'day' : 'days'}`,
+
+  // Personal notes (Canvas planner notes)
+  'btn.newNote': 'New note (Ctrl+N)',
+  'title.newNote': 'New note',
+  'title.editNote': 'Edit note',
+  'note.title': 'Title',
+  'note.titlePlaceholder': 'Study chapter 3',
+  'note.details': 'Details',
+  'note.date': 'Date',
+  'note.time': 'Time',
+  'note.course': 'Course',
+  'note.noCourse': 'None',
+  'note.syncHint': 'Saved to your Canvas planner: it also shows up on the web and in the mobile app.',
+  'note.edit': 'Edit',
+  'note.delete': 'Delete',
+  'note.deleted': 'Note deleted',
+  'note.noDetails': 'No details',
+  'note.errorTitle': 'Enter a title.',
+  'note.errorTitleLong': (n) => `The title can't be longer than ${n} characters.`,
+  'note.errorDetailsLong': (n) => `Details can't be longer than ${n} characters.`,
+  'note.errorDate': 'The date or time is not valid.',
+  'note.errorCourse': 'Invalid course.',
 };
 
 if (typeof module === 'object') module.exports = I18N_EN;

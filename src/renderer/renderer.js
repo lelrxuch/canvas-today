@@ -86,6 +86,12 @@ function el(tag, cls, text) {
 function loadDetails(item, card) {
   const box = card.querySelector('.desc');
   const pts = card.querySelector('.pts');
+  if (item.type === 'planner_note') {
+    // El detalle de una nota ya viene en el planner; no hay nada que pedir.
+    box.textContent = item.details || t('note.noDetails');
+    box.classList.toggle('muted', !item.details);
+    return;
+  }
   if (!details.has(item.id)) details.set(item.id, api.getDetails(item.id));
   details.get(item.id).then((r) => {
     if (!r.ok) {
@@ -162,7 +168,21 @@ function renderItem(item, now) {
   facts.append(el('span', 'attempts'), el('span', 'lock'));
   inner.append(facts, el('p', 'desc', t('loading')));
   const actions = el('div', 'actions');
-  if (item.url) {
+  if (item.type === 'planner_note') {
+    const edit = el('button', 'pill', t('note.edit'));
+    edit.type = 'button';
+    edit.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openNote(item);
+    });
+    const del = el('button', 'pill danger', t('note.delete'));
+    del.type = 'button';
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeNote(card, item);
+    });
+    actions.append(edit, del);
+  } else if (item.url) {
     const open = el('button', 'pill', t('details.open'));
     open.type = 'button';
     open.addEventListener('click', (e) => {
@@ -171,7 +191,7 @@ function renderItem(item, now) {
     });
     actions.append(open);
   }
-  if (item.overdue) {
+  if (item.overdue && item.type !== 'planner_note') {
     const drop = el('button', 'pill danger', t('discard.button'));
     drop.type = 'button';
     drop.addEventListener('click', (e) => {
@@ -232,6 +252,41 @@ async function discard(card, item) {
   render(r.state);
   showToast(t('discard.done'), t('discard.undo'), async () => {
     const u = await api.setComplete(item.id, false);
+    if (u.ok) render(u.state);
+    else showToast(u.error);
+  });
+}
+
+/** Datos de formulario a partir de una nota de la lista, para editarla o recrearla al deshacer. */
+function noteInput(item) {
+  const due = new Date(item.due);
+  return {
+    title: item.title,
+    details: item.details || '',
+    date: localDate(due),
+    time: localTime(due),
+    courseId: item.courseId ?? '',
+  };
+}
+
+/** Saca la tarjeta con la misma animación que Descartar y borra la nota; Deshacer la vuelve a crear. */
+async function removeNote(card, item) {
+  expandedId = null;
+  setExpanded(card, item, false);
+  card.style.maxHeight = `${card.offsetHeight}px`;
+  void card.offsetHeight;
+  card.classList.add('leaving');
+  const [r] = await Promise.all([api.deleteNote(item.id), new Promise((ok) => setTimeout(ok, LEAVE_MS))]);
+  if (!r.ok) {
+    card.classList.remove('leaving');
+    card.style.maxHeight = '';
+    showToast(r.error);
+    return;
+  }
+  render(r.state);
+  const input = noteInput(item);
+  showToast(t('note.deleted'), t('discard.undo'), async () => {
+    const u = await api.saveNote(input);
     if (u.ok) render(u.state);
     else showToast(u.error);
   });
@@ -370,27 +425,130 @@ function fillForm(s) {
   $('#form-error').hidden = true;
 }
 
+/** Muestra una de las vistas ('list', 'settings', 'note') y oculta las demás. */
+function setView(name, title) {
+  const leavingSettings = view === 'settings' && name !== 'settings';
+  view = name;
+  for (const v of ['list', 'settings', 'note']) $(`#view-${v}`).hidden = v !== name;
+  $('#title').textContent = title;
+  $('#btn-settings').classList.toggle('active', name === 'settings');
+  $('#btn-note').classList.toggle('active', name === 'note');
+  $(`#view-${name}`).scrollTop = 0;
+  if (leavingSettings && current) previewOpacity(current.config.tintLevel); // deshace la vista previa si no se guardó
+  if (name === 'list' && current) render(current);
+}
+
 function openSettings() {
   if (!current) return;
-  view = 'settings';
   fillForm(current);
-  $('#view-list').hidden = true;
-  $('#view-settings').hidden = false;
-  $('#title').textContent = t('title.settings');
-  $('#btn-settings').classList.add('active');
-  $('#view-settings').scrollTop = 0;
+  setView('settings', t('title.settings'));
 }
 
 function closeSettings() {
-  view = 'list';
-  $('#view-settings').hidden = true;
-  $('#view-list').hidden = false;
-  $('#title').textContent = t('title.list');
-  $('#btn-settings').classList.remove('active');
-  if (current) {
-    render(current);
-    previewOpacity(current.config.tintLevel); // deshace la vista previa si no se guardó
+  setView('list', t('title.list'));
+}
+
+/* ---------- notas ---------- */
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const localDate = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const localTime = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+
+/** Nota que se está editando, o null si es nueva. */
+let editingNote = null;
+
+/** Cursos con pendientes en la lista: son los del ciclo actual, no los 30+ cursos viejos de la cuenta. */
+function noteCourses(s, selectedId) {
+  const map = new Map();
+  for (const it of s.items) {
+    if (it.courseId !== null && it.courseId !== undefined && it.type !== 'planner_note') {
+      map.set(String(it.courseId), it.course);
+    }
   }
+  if (selectedId && !map.has(String(selectedId)) && editingNote) {
+    map.set(String(selectedId), editingNote.course);
+  }
+  return [...map].sort((a, b) => a[1].localeCompare(b[1], intlLocale));
+}
+
+function openNote(item = null) {
+  if (!current) return;
+  editingNote = item;
+  const f = $('#note-form');
+  const values = item
+    ? noteInput(item)
+    : { title: '', details: '', date: localDate(new Date()), time: '', courseId: '' };
+  f.title.value = values.title;
+  f.details.value = values.details;
+  f.date.value = values.date;
+  // 23:59 es la hora por defecto; mostrar el campo vacío evita que parezca elegida.
+  f.time.value = values.time === '23:59' ? '' : values.time;
+  const sel = f.courseId;
+  sel.replaceChildren(new Option(t('note.noCourse'), ''));
+  for (const [id, name] of noteCourses(current, values.courseId)) sel.append(new Option(name, id));
+  sel.value = String(values.courseId ?? '');
+  $('#btn-note-delete').hidden = !item;
+  $('#note-error').hidden = true;
+  setView('note', t(item ? 'title.editNote' : 'title.newNote'));
+  f.title.focus();
+}
+
+function closeNote() {
+  editingNote = null;
+  setView('list', t('title.list'));
+}
+
+function noteError(message) {
+  const error = $('#note-error');
+  error.textContent = message;
+  error.hidden = false;
+  error.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function saveNoteForm(e) {
+  e.preventDefault();
+  const f = $('#note-form');
+  const payload = {
+    id: editingNote ? editingNote.id : null,
+    title: f.title.value,
+    details: f.details.value,
+    date: f.date.value,
+    time: f.time.value,
+    courseId: f.courseId.value,
+  };
+  const btn = $('#btn-note-save');
+  btn.disabled = true;
+  btn.textContent = t('settings.saving');
+  try {
+    const res = await api.saveNote(payload);
+    if (!res.ok) {
+      noteError(res.error);
+      return;
+    }
+    current = res.state;
+    closeNote();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('settings.save');
+  }
+}
+
+async function deleteNoteFromForm() {
+  if (!editingNote) return;
+  const item = editingNote;
+  const res = await api.deleteNote(item.id);
+  if (!res.ok) {
+    noteError(res.error);
+    return;
+  }
+  current = res.state;
+  closeNote();
+  const input = noteInput(item);
+  showToast(t('note.deleted'), t('discard.undo'), async () => {
+    const u = await api.saveNote(input);
+    if (u.ok) render(u.state);
+    else showToast(u.error);
+  });
 }
 
 async function saveSettings(e) {
@@ -449,6 +607,10 @@ $('#btn-min').addEventListener('click', () => api.minimize());
 $('#btn-pin').addEventListener('click', async () => render(await api.togglePin()));
 $('#btn-refresh').addEventListener('click', doRefresh);
 $('#btn-settings').addEventListener('click', () => (view === 'settings' ? closeSettings() : openSettings()));
+$('#btn-note').addEventListener('click', () => (view === 'note' ? closeNote() : openNote()));
+$('#note-form').addEventListener('submit', saveNoteForm);
+$('#btn-note-cancel').addEventListener('click', closeNote);
+$('#btn-note-delete').addEventListener('click', deleteNoteFromForm);
 $('#btn-open-canvas').addEventListener('click', () => api.openCanvas());
 $('#btn-login').addEventListener('click', () => api.openLogin());
 $('#btn-cancel').addEventListener('click', closeSettings);
@@ -459,7 +621,12 @@ document.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey;
   if (e.key === 'Escape') {
     if (view === 'settings') closeSettings();
+    else if (view === 'note') closeNote();
     else api.hide();
+  }
+  if (mod && e.key.toLowerCase() === 'n') {
+    e.preventDefault();
+    openNote();
   }
   if (mod && e.key.toLowerCase() === 'r') {
     e.preventDefault();
