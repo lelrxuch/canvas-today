@@ -1,12 +1,21 @@
-# Avisos semanales de dependencias y acciones de GitHub con versiones nuevas o vulnerables.
+# Actualizaciones semanales agrupadas en un solo PR por tipo. Las versiones mayores (AGP 9, Gradle 9,
+# Electron nuevo, etc.) se ignoran: cambian la configuración y se hacen a mano cuando haga falta.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    groups:
+      dependencias:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      acciones:
+        patterns: ["*"]
