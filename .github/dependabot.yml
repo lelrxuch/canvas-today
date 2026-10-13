@@ -10,12 +10,12 @@ updates:
       dependencias:
         update-types: [minor, patch]
     ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     groups:
       acciones:
-        patterns: ["*"]
+        patterns: ['*']
